@@ -1,25 +1,20 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: linear-gradient(145deg, #1e3c2c 0%, #2a5a3a 100%); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 10px; }
-#app { width: 100%; max-width: 650px; margin: auto; background: #2e4a2e; border-radius: 30px; box-shadow: 0 10px 25px black; overflow: hidden; color: #f5f5dc; min-height: 600px; }
-.screen { padding: 20px; display: flex; flex-direction: column; gap: 15px; }
-.card { background: #1f3b1a; border-radius: 30px; padding: 20px; margin: 10px 0; }
-input, button { width: 100%; padding: 12px; border-radius: 40px; border: none; font-size: 16px; margin: 8px 0; }
-button { background: #e9b35f; font-weight: bold; cursor: pointer; transition: 0.2s; }
-button:active { transform: scale(0.97); }
-.tabs { display: flex; gap: 5px; background: #1f3b1a; padding: 8px; flex-wrap: wrap; }
-.tab-btn { background: #3b5e2b; color: white; flex: 1; }
-.tab-btn.active { background: #ffcf4a; color: #1f3b1a; }
-.tab-content { display: none; padding: 15px; }
-.tab-content.active { display: block; }
-.fields-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 12px; margin-bottom: 20px; }
-.field-slot { background: #7c5e3a; border-radius: 20px; padding: 20px 5px; text-align: center; cursor: pointer; }
-.field-slot.ready { background: #e9b35f; color: black; }
-.crops-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
-.crop-btn, .sell-btn, .animal-card { background: #3f6b3a; padding: 8px 12px; border-radius: 40px; border: none; color: white; cursor: pointer; }
-.animals-list { display: flex; flex-direction: column; gap: 10px; }
-.market-listings { display: flex; flex-direction: column; gap: 10px; }
-.listing-card { background: #1f3b1a; border-radius: 20px; padding: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
-.harvest-btn { width: 100%; background: #d4a373; margin-top: 15px; padding: 12px; border-radius: 40px; font-weight: bold; }
-.error { color: #ffaaaa; }
-.success { color: #c3ffb3; }
-.info { color: #ffe6a3; }
+body {
+    background: linear-gradient(145deg, #1e3c2c 0%, #2a5a3a 100%);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 10px;
+}
+#app {
+    width: 100%;
+    max-width: 650px;
+    margin: auto;
+    background: #2e4a2e;
+    border-radius: 30px;
+    box-shadow: 0 10px 25px black;
+    overflow: hidden;
+    color: #f5f5dc;
+}
