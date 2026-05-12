@@ -1,9 +1,17 @@
-// إعداد Supabase (استبدل بقيم مشروعك)
+// إعداد Supabase
 const SUPABASE_URL = 'https://kzheikbpxicoeohapfjb.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_aVm9aZ6W5vYTVvTxo3hucw__uZ06aId';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// بيانات اللعبة الأساسية
+// استخدام تعريفي مختلف (ليس const supabase = ...)
+let supabase;
+if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} else {
+    alert('خطأ: مكتبة Supabase لم تحمل بشكل صحيح.');
+    throw new Error('Supabase library missing');
+}
+
+// ثم باقي الكود (بدون أي تعريف آخر لـ supabase)
 const CROPS = {
     "Wheat": { nameAr: "قمح", emoji: "🌾", buy: 2, sell: 5, growTime: 5, levelReq: 1 },
     "Tomato": { nameAr: "طماطم", emoji: "🍅", buy: 3, sell: 8, growTime: 7, levelReq: 2 },
@@ -20,11 +28,9 @@ let currentUser = null;
 let playerData = null;
 let currentGameType = 'farm';
 
-// ******* إضافة دالة showMessage (هذا كان مفقوداً) *******
 function showMessage(msg, type) {
-    let msgDiv = document.getElementById('loginMsg'); // نستخدم عنصر عام
+    let msgDiv = document.getElementById('loginMsg');
     if (!msgDiv) {
-        // إذا لم يوجد ننشئ واحداً مؤقتاً
         msgDiv = document.createElement('div');
         msgDiv.id = 'tempMsg';
         document.body.appendChild(msgDiv);
@@ -33,7 +39,6 @@ function showMessage(msg, type) {
     msgDiv.style.color = type === 'error' ? '#ffaaaa' : (type === 'success' ? '#c3ffb3' : '#ffe6a3');
     setTimeout(() => { if (msgDiv.innerText === msg) msgDiv.innerText = ''; }, 2500);
 }
-// *****************************************************
 
 async function loadUserData() {
     const { data, error } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
@@ -169,7 +174,7 @@ function renderGameUI() {
     if (!container) return;
     let html = `
         <div class="screen active" id="gameScreen">
-            <div class="stats-bar" style="display:flex; justify-content:space-between; background:#1f3b1a; padding:10px;">
+            <div style="display:flex; justify-content:space-between; background:#1f3b1a; padding:10px;">
                 <span>💰 ${playerData.gold} ذهب</span>
                 <span>⭐ ${playerData.score || 0}</span>
                 <span>👤 ${playerData.username}</span>
@@ -190,45 +195,45 @@ function renderGameUI() {
     function renderTabContent() {
         if (!tabContentDiv) return;
         if (activeTab === 'farm') {
-            let fieldsHtml = '<div class="fields-grid">';
+            let fieldsHtml = '<div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px;">';
             for (let i=0; i<4; i++) {
                 let f = playerData.game_data.fields[i];
                 if (f) {
                     let crop = CROPS[f.cropKey];
                     let ready = (Date.now() - f.plantedAt)/1000 >= crop.growTime;
-                    fieldsHtml += `<div class="field-slot ${ready ? 'ready' : ''}" onclick="window.harvestField(${i})">${crop.emoji} ${crop.nameAr}<br>${ready ? 'جاهز' : 'ينمو'}</div>`;
+                    fieldsHtml += `<div style="background:#7c5e3a; border-radius:20px; padding:20px; text-align:center; cursor:pointer;" class="${ready ? 'ready' : ''}" onclick="window.harvestField(${i})">${crop.emoji} ${crop.nameAr}<br>${ready ? 'جاهز' : 'ينمو'}</div>`;
                 } else {
                     let cropBtns = '';
-                    for (let [k,c] of Object.entries(CROPS)) cropBtns += `<button class="crop-btn" onclick="window.plantCrop('${k}',${i})">${c.emoji} ${c.nameAr} (${c.buy})</button>`;
-                    fieldsHtml += `<div class="field-slot">🌾 حقل فارغ<br>${cropBtns}</div>`;
+                    for (let [k,c] of Object.entries(CROPS)) cropBtns += `<button style="margin:5px; padding:8px; border-radius:20px; background:#e9b35f;" onclick="window.plantCrop('${k}',${i})">${c.emoji} ${c.nameAr} (${c.buy})</button>`;
+                    fieldsHtml += `<div style="background:#9b7652; border-radius:20px; padding:20px; text-align:center;">🌾 حقل فارغ<br>${cropBtns}</div>`;
                 }
             }
-            fieldsHtml += '</div><button class="harvest-btn" onclick="window.harvestAll()">حصاد الكل</button>';
+            fieldsHtml += '</div><button style="width:100%; margin-top:15px; padding:10px; background:#d4a373;" onclick="window.harvestAll()">حصاد الكل</button>';
             tabContentDiv.innerHTML = fieldsHtml;
         } else if (activeTab === 'animals') {
-            let animalsHtml = '<div class="animals-list">';
+            let animalsHtml = '<div>';
             playerData.game_data.animals.forEach((a,idx) => {
                 let ready = (Date.now() - a.lastCollect) >= ANIMALS.Chicken.interval;
-                animalsHtml += `<div class="animal-card" onclick="window.collectAnimal(${idx})">🐔 دجاجة - ${ready ? 'جاهزة' : 'تنتظر'} 🥚</div>`;
+                animalsHtml += `<div style="background:#3f6b3a; padding:10px; margin:5px; border-radius:30px;" onclick="window.collectAnimal(${idx})">🐔 دجاجة - ${ready ? 'جاهزة' : 'تنتظر'} 🥚</div>`;
             });
-            animalsHtml += `<button class="buy-animal-btn" onclick="window.buyAnimal()">🐔 شراء دجاجة (20)</button></div>`;
+            animalsHtml += `<button style="width:100%; margin-top:10px; padding:10px; background:#6b8c42;" onclick="window.buyAnimal()">🐔 شراء دجاجة (20)</button></div>`;
             tabContentDiv.innerHTML = animalsHtml;
         } else if (activeTab === 'kitchen') {
-            let recipesHtml = '<div class="crops-list">';
+            let recipesHtml = '<div>';
             for (let [k,r] of Object.entries(RECIPES)) {
-                recipesHtml += `<button class="crop-btn" onclick="window.cookRecipe('${k}')">${r.emoji} ${r.nameAr} (بيع ${r.sell})</button>`;
+                recipesHtml += `<button style="margin:5px; padding:10px; background:#e9b35f;" onclick="window.cookRecipe('${k}')">${r.emoji} ${r.nameAr} (بيع ${r.sell})</button>`;
             }
             recipesHtml += '</div>';
             tabContentDiv.innerHTML = recipesHtml;
         } else if (activeTab === 'market') {
             (async () => {
                 const listings = await loadMarketListings();
-                let marketHtml = '<div class="market-listings"><h3>📢 إعلانات السوق</h3>';
+                let marketHtml = '<div><h3>📢 إعلانات السوق</h3>';
                 for (let l of listings) {
                     marketHtml += `
-                        <div class="listing-card">
-                            <span>${l.item_name} x${l.quantity}</span>
-                            <span>💰 ${l.price_per_unit} لكل وحدة</span>
+                        <div style="background:#1f3b1a; margin:10px; padding:10px; border-radius:20px;">
+                            <span>${l.item_name} x${l.quantity}</span> - 
+                            <span>💰 ${l.price_per_unit} لكل وحدة</span> - 
                             <span>👤 ${l.seller?.username || 'بائع'}</span>
                             <button onclick="window.buyListing(${JSON.stringify(l).replace(/"/g, '&quot;')})">شراء</button>
                         </div>`;
@@ -245,8 +250,12 @@ function renderGameUI() {
     }
     tabs.forEach(t => {
         const btn = document.createElement('button');
-        btn.className = `tab-btn ${activeTab === t.id ? 'active' : ''}`;
         btn.innerText = t.name;
+        btn.style.background = activeTab === t.id ? '#ffcf4a' : '#3b5e2b';
+        btn.style.padding = '10px';
+        btn.style.margin = '5px';
+        btn.style.borderRadius = '20px';
+        btn.style.border = 'none';
         btn.onclick = () => { switchTab(t.id); };
         tabsContainer.appendChild(btn);
     });
@@ -257,13 +266,13 @@ function renderGameUI() {
 async function renderLoginScreen() {
     const container = document.getElementById('app');
     container.innerHTML = `
-        <div class="screen active" id="loginScreen">
-            <div class="card">
+        <div style="padding:20px; text-align:center;">
+            <div style="background:#1f3b1a; border-radius:20px; padding:20px;">
                 <h2>🌾 منصة الألعاب المشتركة</h2>
-                <input type="email" id="email" placeholder="البريد الإلكتروني">
-                <input type="password" id="password" placeholder="كلمة المرور">
-                <button id="loginBtn">دخول</button>
-                <button id="signupBtn">تسجيل جديد</button>
+                <input type="email" id="email" placeholder="البريد الإلكتروني" style="width:90%; padding:10px; margin:10px; border-radius:30px;">
+                <input type="password" id="password" placeholder="كلمة المرور" style="width:90%; padding:10px; margin:10px; border-radius:30px;">
+                <button id="loginBtn" style="width:90%; padding:10px; margin:5px; background:#e9b35f; border-radius:30px;">دخول</button>
+                <button id="signupBtn" style="width:90%; padding:10px; margin:5px; background:#3b5e2b; border-radius:30px;">تسجيل جديد</button>
                 <div id="loginMsg"></div>
             </div>
         </div>
@@ -287,11 +296,11 @@ async function renderLoginScreen() {
 async function renderChooseGameScreen() {
     const container = document.getElementById('app');
     container.innerHTML = `
-        <div class="screen active" id="chooseScreen">
-            <div class="card">
+        <div style="padding:20px; text-align:center;">
+            <div style="background:#1f3b1a; border-radius:20px; padding:20px;">
                 <h2>اختر نوع لعبتك</h2>
-                <button id="chooseFarm">🌾 مزرعة</button>
-                <button id="chooseRestaurant">🍽️ مطعم</button>
+                <button id="chooseFarm" style="width:80%; padding:10px; margin:10px; background:#e9b35f; border-radius:30px;">🌾 مزرعة</button>
+                <button id="chooseRestaurant" style="width:80%; padding:10px; margin:10px; background:#e9b35f; border-radius:30px;">🍽️ مطعم</button>
                 <div id="chooseMsg"></div>
             </div>
         </div>
