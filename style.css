@@ -1,412 +1,440 @@
-// -------------------- بيانات اللعبة --------------------
-const CROPS = {
-    "Wheat": { nameAr: "قمح", nameEn: "Wheat", emoji: "🌾", buy: 2, sell: 5, growTime: 5, levelReq: 1 },
-    "Tomato": { nameAr: "طماطم", nameEn: "Tomato", emoji: "🍅", buy: 3, sell: 8, growTime: 7, levelReq: 2 },
-    "Carrot": { nameAr: "جزر", nameEn: "Carrot", emoji: "🥕", buy: 1, sell: 4, growTime: 4, levelReq: 1 },
-    "Potato": { nameAr: "بطاطا", nameEn: "Potato", emoji: "🥔", buy: 2, sell: 6, growTime: 6, levelReq: 1 },
-    "Corn": { nameAr: "ذرة", nameEn: "Corn", emoji: "🌽", buy: 3, sell: 7, growTime: 8, levelReq: 2 },
-};
-const ANIMALS = {
-    "Chicken": { nameAr: "دجاجة", nameEn: "Chicken", emoji: "🐔", product: "Egg", productEmoji: "🥚", price: 20, interval: 10000, sellProduct: 3 },
-    "Cow": { nameAr: "بقرة", nameEn: "Cow", emoji: "🐄", product: "Milk", productEmoji: "🥛", price: 50, interval: 20000, sellProduct: 8 },
-    "Sheep": { nameAr: "خروف", nameEn: "Sheep", emoji: "🐑", product: "Wool", productEmoji: "🧶", price: 40, interval: 15000, sellProduct: 6 },
-};
-
-// قائمة المهام اليومية (ثابتة)
-const DAILY_TASKS = [
-    { id: "plant",   nameAr: "🌾 ازرع 3 محاصيل",      nameEn: "🌾 Plant 3 crops",      target: 3, reward: 10, type: "plantCount" },
-    { id: "harvest", nameAr: "✂ احصد 5 محاصيل",      nameEn: "✂ Harvest 5 crops",    target: 5, reward: 15, type: "harvestCount" },
-    { id: "egg",     nameAr: "🥚 اجمع بيض الدجاج",    nameEn: "🥚 Collect chicken eggs", target: 1, reward: 5,  type: "eggCollect" },
-    { id: "sell",    nameAr: "🛒 بع 5 منتجات بالسوق", nameEn: "🛒 Sell 5 items",       target: 5, reward: 20, type: "sellCount" },
-    { id: "ad",      nameAr: "📺 شاهد إعلاناً",        nameEn: "📺 Watch an ad",       target: 1, reward: 25, type: "adWatch" }
-];
-
-// حالة اللاعب
-let player = {
-    username: "مزارع",
-    farmCoins: 50,
-    score: 0,
-    level: 1,
-    fields: [],
-    animals: [],
-    inventory: {},
-    totalHarvested: 0,
-    language: "ar",
-    // بيانات المهام اليومية
-    tasks: {},
-    lastTaskReset: Date.now(),
-};
-
-// -------------------- دوال مساعدة --------------------
-function getCurrentLang() { return player.language; }
-function t(key, ar, en) { return player.language === "ar" ? ar : en; }
-function saveGame() { localStorage.setItem("farmGameSave", JSON.stringify(player)); }
-
-function loadGame() {
-    const saved = localStorage.getItem("farmGameSave");
-    if (saved) {
-        try {
-            const data = JSON.parse(saved);
-            player = { ...player, ...data };
-            if (!player.tasks) player.tasks = {};
-            if (!player.lastTaskReset) player.lastTaskReset = Date.now();
-            checkResetDailyTasks();
-            updateUI();
-        } catch(e) { console.log(e); }
-    }
-    recalcLevel();
-    updateUI();
+* {
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
-// التحقق من تجديد المهام اليومية (كل 24 ساعة)
-function checkResetDailyTasks() {
-    const now = Date.now();
-    const oneDay = 86400000; // 24 ساعة
-    if (now - player.lastTaskReset >= oneDay) {
-        // تجديد المهام
-        player.tasks = {};
-        DAILY_TASKS.forEach(task => {
-            player.tasks[task.id] = { progress: 0, completed: false };
-        });
-        player.lastTaskReset = now;
-        saveGame();
-        showMessage(t("newTasks", "✨ تم تجديد المهام اليومية!", "✨ Daily tasks reset!"), "success");
-    } else {
-        // التأكد من وجود هيكل المهام
-        DAILY_TASKS.forEach(task => {
-            if (!player.tasks[task.id]) {
-                player.tasks[task.id] = { progress: 0, completed: false };
-            }
-        });
-    }
+body {
+    margin: 0;
+    background: linear-gradient(145deg, #1e3c2c 0%, #2a5a3a 100%);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 10px;
 }
 
-// إضافة تقدم لمهمة معينة
-function addTaskProgress(taskId, increment = 1) {
-    if (!player.tasks[taskId]) return;
-    let task = player.tasks[taskId];
-    if (task.completed) return;
-    const originalTask = DAILY_TASKS.find(t => t.id === taskId);
-    task.progress += increment;
-    if (task.progress >= originalTask.target) {
-        task.completed = true;
-        player.farmCoins += originalTask.reward;
-        player.score += 2;
-        showMessage(t("taskComplete", `✅ أنجزت "${originalTask.nameAr}" وكسبت ${originalTask.reward} عملة!`, `✅ Completed "${originalTask.nameEn}" and earned ${originalTask.reward} coins!`), "success");
-        recalcLevel();
-    }
-    saveGame();
-    updateUI();
+.app-container {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    background: #2e4a2e;
+    border-radius: 30px 30px 20px 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    overflow: hidden;
+    color: #f5f5dc;
 }
 
-// دوال اللعبة الأساسية
-function recalcLevel() { player.level = Math.max(1, Math.floor(player.score / 10) + 1); }
-function addCoins(amount) { player.farmCoins += amount; updateUI(); saveGame(); }
-function addScore(points) { player.score += points; recalcLevel(); updateUI(); saveGame(); }
-
-function plantCrop(cropKey, fieldIndex) {
-    const crop = CROPS[cropKey];
-    if (!crop) return false;
-    if (player.farmCoins < crop.buy) { showMessage(`لا تملك ${crop.buy} عملة`, "warning"); return false; }
-    if (player.level < crop.levelReq) { showMessage(`يتطلب مستوى ${crop.levelReq}`, "warning"); return false; }
-    player.farmCoins -= crop.buy;
-    player.fields[fieldIndex] = { cropKey: cropKey, plantedAt: Date.now() };
-    // تقدم مهمة الزراعة
-    addTaskProgress("plant");
-    saveGame();
-    updateUI();
-    showMessage(`زرعت ${getCurrentLang() === "ar" ? crop.nameAr : crop.nameEn}!`, "success");
-    return true;
+/* رأس الصفحة */
+header {
+    background: #1f3b1a;
+    padding: 10px 15px;
+    border-bottom: 2px solid #d4a373;
 }
 
-function harvestField(index) {
-    const field = player.fields[index];
-    if (!field) return;
-    const crop = CROPS[field.cropKey];
-    const elapsed = (Date.now() - field.plantedAt) / 1000;
-    if (elapsed >= crop.growTime) {
-        player.farmCoins += crop.sell;
-        player.score += 1;
-        player.inventory[field.cropKey] = (player.inventory[field.cropKey] || 0) + 1;
-        player.totalHarvested++;
-        player.fields[index] = null;
-        addTaskProgress("harvest");
-        recalcLevel();
-        updateUI();
-        showMessage(`حصّدت ${crop.nameAr} +${crop.sell} عملة`, "success");
-        saveGame();
-    } else {
-        let remain = Math.ceil(crop.growTime - elapsed);
-        showMessage(`ينمو بعد ${remain} ثانية`, "info");
-    }
-}
-function harvestAll() {
-    let harvested = 0;
-    for (let i = 0; i < player.fields.length; i++) {
-        const f = player.fields[i];
-        if (f) {
-            const crop = CROPS[f.cropKey];
-            const elapsed = (Date.now() - f.plantedAt) / 1000;
-            if (elapsed >= crop.growTime) {
-                player.farmCoins += crop.sell;
-                player.score += 1;
-                player.inventory[f.cropKey] = (player.inventory[f.cropKey] || 0) + 1;
-                player.totalHarvested++;
-                player.fields[i] = null;
-                harvested++;
-                addTaskProgress("harvest");
-            }
-        }
-    }
-    if (harvested) { recalcLevel(); updateUI(); showMessage(`حصّدت ${harvested} محصول`, "success"); saveGame(); }
-    else showMessage("لا محاصيل ناضجة", "info");
+.lang-switch {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-bottom: 10px;
 }
 
-function buyAnimal(animalKey) {
-    const animal = ANIMALS[animalKey];
-    if (player.farmCoins < animal.price) { showMessage(`لا تملك ${animal.price} عملة`, "warning"); return; }
-    player.farmCoins -= animal.price;
-    player.animals.push({ type: animalKey, lastCollect: Date.now() - animal.interval });
-    updateUI();
-    showMessage(`اشتريت ${animal.nameAr}!`, "success");
-    saveGame();
-}
-function collectAnimal(idx) {
-    const anim = player.animals[idx];
-    const animal = ANIMALS[anim.type];
-    const now = Date.now();
-    if (now - anim.lastCollect >= animal.interval) {
-        const product = animal.product;
-        player.inventory[product] = (player.inventory[product] || 0) + 1;
-        player.farmCoins += animal.sellProduct;
-        player.score += 1;
-        anim.lastCollect = now;
-        if (product === "Egg") addTaskProgress("egg");
-        updateUI();
-        showMessage(`جمعت ${animal.productEmoji} ${product} +${animal.sellProduct} عملة`, "success");
-        saveGame();
-    } else {
-        let remain = Math.ceil((animal.interval - (now - anim.lastCollect)) / 1000);
-        showMessage(`جاهز بعد ${remain} ثانية`, "info");
-    }
-}
-function sellInventoryItem(itemKey) {
-    let qty = player.inventory[itemKey] || 0;
-    if (qty <= 0) return;
-    let price = 0;
-    if (CROPS[itemKey]) price = CROPS[itemKey].sell;
-    else {
-        for (let a of Object.values(ANIMALS)) if (a.product === itemKey) price = a.sellProduct;
-    }
-    if (price > 0) {
-        player.inventory[itemKey]--;
-        player.farmCoins += price;
-        addTaskProgress("sell");
-        updateUI();
-        showMessage(`بعت ${itemKey} بـ ${price} عملة`, "success");
-        saveGame();
-    }
-}
-function watchAd() {
-    const btn = document.getElementById("watchAdBtn");
-    btn.disabled = true;
-    btn.innerText = "⏳ جارٍ تشغيل الإعلان...";
-    setTimeout(() => {
-        const reward = 10;
-        player.farmCoins += reward;
-        addTaskProgress("ad");
-        saveGame();
-        updateUI();
-        btn.disabled = false;
-        btn.innerText = t("watchAd", "📺 شاهد إعلان واحصل على 10 عملات", "📺 Watch Ad & get 10 Coins");
-        showMessage(`شكراً! +${reward} عملة 🎉`, "success");
-    }, 1500);
-}
-function showMessage(msg, type) {
-    const msgDiv = document.getElementById("adMessage");
-    msgDiv.innerText = msg;
-    msgDiv.style.color = type === "error" ? "#ffaaaa" : (type === "success" ? "#c3ffb3" : "#ffe6a3");
-    setTimeout(() => { if (msgDiv.innerText === msg) msgDiv.innerText = ""; }, 2500);
+.lang-btn {
+    background: #3b5e2b;
+    border: none;
+    color: white;
+    padding: 5px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.2s;
 }
 
-// -------------------- تحديث الواجهة --------------------
-function updateUI() {
-    document.getElementById("farmCoins").innerText = player.farmCoins;
-    document.getElementById("level").innerText = player.level;
-    document.getElementById("score").innerText = player.score;
-    document.getElementById("coinName").innerText = player.language === "ar" ? "عملة المزرعة" : "FarmCoin";
-    // حقول الزرع
-    const fieldsDiv = document.getElementById("fieldsGrid");
-    fieldsDiv.innerHTML = "";
-    for (let i = 0; i < 4; i++) {
-        const f = player.fields[i];
-        let html = `<div class="field-slot empty" data-field-index="${i}">`;
-        if (f) {
-            const crop = CROPS[f.cropKey];
-            const elapsed = (Date.now() - f.plantedAt) / 1000;
-            const ready = elapsed >= crop.growTime;
-            const cropName = player.language === "ar" ? crop.nameAr : crop.nameEn;
-            if (ready) html = `<div class="field-slot ready" data-field-index="${i}">✅ ${crop.emoji} ${cropName}<br><small>جاهز!</small>`;
-            else { let remain = Math.ceil(crop.growTime - elapsed); html = `<div class="field-slot" data-field-index="${i}">🌱 ${crop.emoji} ${cropName}<br><small>${remain} ثانية</small>`; }
-        } else html = `<div class="field-slot empty" data-field-index="${i}">🌾 حقل فارغ<br><small>اضغط للزراعة</small>`;
-        html += `</div>`;
-        fieldsDiv.innerHTML += html;
-    }
-    document.querySelectorAll(".field-slot").forEach(el => {
-        const idx = parseInt(el.dataset.fieldIndex);
-        el.addEventListener("click", (e) => {
-            e.stopPropagation();
-            if (player.fields[idx]) harvestField(idx);
-            else showCropSelectionPopup(idx);
-        });
-    });
-    // قائمة المحاصيل
-    const cropsContainer = document.getElementById("cropsList");
-    cropsContainer.innerHTML = "";
-    for (let [key, crop] of Object.entries(CROPS)) {
-        if (player.level >= crop.levelReq) {
-            let btn = document.createElement("button");
-            btn.className = "crop-btn";
-            let name = player.language === "ar" ? crop.nameAr : crop.nameEn;
-            btn.innerText = `${crop.emoji} ${name} (${crop.buy} عملة)`;
-            btn.addEventListener("click", () => {
-                let emptyIdx = player.fields.findIndex(f => f === null);
-                if (emptyIdx !== -1) plantCrop(key, emptyIdx);
-                else showMessage("لا حقول فارغة!", "warning");
-            });
-            cropsContainer.appendChild(btn);
-        }
-    }
-    // حيوانات
-    const animalsDiv = document.getElementById("animalsList");
-    animalsDiv.innerHTML = "";
-    player.animals.forEach((anim, idx) => {
-        let animal = ANIMALS[anim.type];
-        let now = Date.now();
-        let ready = (now - anim.lastCollect) >= animal.interval;
-        let status = ready ? "جاهز!" : `${Math.ceil((animal.interval - (now - anim.lastCollect))/1000)} ثانية`;
-        let div = document.createElement("div");
-        div.className = "animal-card";
-        div.innerText = `${animal.emoji} ${player.language === "ar" ? animal.nameAr : animal.nameEn} - ${animal.productEmoji} ${animal.product} : ${status}`;
-        if (ready) div.style.background = "#e9b35f";
-        div.addEventListener("click", () => collectAnimal(idx));
-        animalsDiv.appendChild(div);
-    });
-    // مخزون السوق
-    const invDiv = document.getElementById("inventoryList");
-    invDiv.innerHTML = "";
-    for (let [item, qty] of Object.entries(player.inventory)) {
-        if (qty > 0) {
-            let emoji = CROPS[item] ? CROPS[item].emoji : (Object.values(ANIMALS).find(a=>a.product===item)?.productEmoji || "📦");
-            let price = CROPS[item] ? CROPS[item].sell : (Object.values(ANIMALS).find(a=>a.product===item)?.sellProduct || 0);
-            let btn = document.createElement("button");
-            btn.className = "sell-btn";
-            btn.innerText = `${emoji} ${item} (${qty}) - بيع بـ ${price} عملة`;
-            btn.addEventListener("click", () => sellInventoryItem(item));
-            invDiv.appendChild(btn);
-        }
-    }
-    // إحصائيات
-    const statsDiv = document.getElementById("statsDetails");
-    statsDiv.innerHTML = `<p>👤 ${player.username}</p><p>🪙 ${player.farmCoins}</p><p>⭐ ${player.score}</p><p>🏆 مستوى ${player.level}</p><p>🌾 حصاد: ${player.totalHarvested}</p><p>🐔 حيوانات: ${player.animals.length}</p>`;
-    // المهام اليومية
-    renderDailyTasks();
+.lang-btn.active {
+    background: #e9b35f;
+    color: #1f3b1a;
+    font-weight: bold;
 }
-function renderDailyTasks() {
-    const tasksDiv = document.getElementById("dailyTasksList");
-    if (!tasksDiv) return;
-    tasksDiv.innerHTML = "";
-    checkResetDailyTasks();
-    DAILY_TASKS.forEach(task => {
-        let taskData = player.tasks[task.id];
-        if (!taskData) return;
-        let progress = taskData.progress;
-        let completed = taskData.completed;
-        let percent = Math.min(100, (progress / task.target) * 100);
-        let name = player.language === "ar" ? task.nameAr : task.nameEn;
-        let rewardText = player.language === "ar" ? `مكافأة: ${task.reward} عملة` : `Reward: ${task.reward} coins`;
-        let statusText = completed ? (player.language === "ar" ? "✅ مكتملة" : "✅ Completed") : `${progress}/${task.target}`;
-        let card = document.createElement("div");
-        card.className = "task-card";
-        card.innerHTML = `
-            <div class="task-title"><span>${name}</span><span>${rewardText}</span></div>
-            <div class="task-progress"><div class="task-progress-fill" style="width:${percent}%;"></div></div>
-            <div class="task-status">${statusText}</div>
-        `;
-        tasksDiv.appendChild(card);
-    });
-    const msgDiv = document.getElementById("tasksResetMessage");
-    if (msgDiv) {
-        let now = Date.now();
-        let nextReset = player.lastTaskReset + 86400000;
-        let hoursLeft = Math.ceil((nextReset - now) / 3600000);
-        if (hoursLeft > 0 && hoursLeft < 24) {
-            msgDiv.innerText = player.language === "ar" ? `⏳ تجديد المهام بعد ${hoursLeft} ساعة` : `⏳ Tasks reset in ${hoursLeft} hours`;
-        } else msgDiv.innerText = "";
-    }
-}
-function showCropSelectionPopup(fieldIdx) {
-    const popup = document.createElement("div");
-    popup.className = "popup-overlay";
-    popup.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; justify-content:center; align-items:center; z-index:1000;";
-    const inner = document.createElement("div");
-    inner.style.cssText = "background:#3b5e2b; padding:20px; border-radius:30px; width:80%; max-width:300px; text-align:center;";
-    inner.innerHTML = "<h3>🌾 اختر محصولاً</h3>";
-    for (let [key, crop] of Object.entries(CROPS)) {
-        if (player.level >= crop.levelReq) {
-            let btn = document.createElement("button");
-            btn.innerText = `${crop.emoji} ${player.language === "ar" ? crop.nameAr : crop.nameEn} (${crop.buy})`;
-            btn.style.cssText = "display:block; margin:8px auto; padding:8px; border-radius:40px; background:#ffcf4a; border:none;";
-            btn.onclick = () => {
-                plantCrop(key, fieldIdx);
-                document.body.removeChild(popup);
-            };
-            inner.appendChild(btn);
-        }
-    }
-    let closeBtn = document.createElement("button");
-    closeBtn.innerText = "إغلاق";
-    closeBtn.onclick = () => document.body.removeChild(popup);
-    inner.appendChild(closeBtn);
-    popup.appendChild(inner);
-    document.body.appendChild(popup);
-}
-// تحديث دوري
-setInterval(() => { updateUI(); saveGame(); }, 1000);
 
-// أحداث الأزرار
-document.getElementById("watchAdBtn").addEventListener("click", watchAd);
-document.getElementById("harvestAllBtn").addEventListener("click", harvestAll);
-document.getElementById("buyChickenBtn").addEventListener("click", () => buyAnimal("Chicken"));
-document.getElementById("buyCowBtn").addEventListener("click", () => buyAnimal("Cow"));
-document.getElementById("buySheepBtn").addEventListener("click", () => buyAnimal("Sheep"));
-document.querySelectorAll(".tab-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-        let tabId = btn.dataset.tab;
-        document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
-        document.getElementById(`${tabId}Tab`).classList.add("active");
-        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        if (tabId === "tasks") renderDailyTasks();
-    });
-});
-// تبديل اللغة
-document.getElementById("langAr").addEventListener("click", () => {
-    player.language = "ar";
-    document.documentElement.lang = "ar";
-    document.documentElement.dir = "rtl";
-    document.getElementById("langAr").classList.add("active");
-    document.getElementById("langEn").classList.remove("active");
-    updateUI();
-});
-document.getElementById("langEn").addEventListener("click", () => {
-    player.language = "en";
-    document.documentElement.lang = "en";
-    document.documentElement.dir = "ltr";
-    document.getElementById("langEn").classList.add("active");
-    document.getElementById("langAr").classList.remove("active");
-    updateUI();
-});
-// تهيئة
-loadGame();
-updateUI();
+.stats-bar {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: bold;
+    background: #2c4d2a;
+    padding: 8px 12px;
+    border-radius: 30px;
+}
+
+.stat {
+    background: #1d3b18;
+    padding: 4px 10px;
+    border-radius: 25px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* قسم الإعلان */
+.ad-section {
+    background: #f4c542;
+    padding: 8px;
+    text-align: center;
+    margin: 8px;
+    border-radius: 40px;
+}
+
+.ad-btn {
+    background: #ff9800;
+    border: none;
+    font-size: 16px;
+    padding: 10px 15px;
+    border-radius: 50px;
+    font-weight: bold;
+    color: #2c2c2c;
+    cursor: pointer;
+    width: 90%;
+    transition: 0.2s;
+}
+
+.ad-btn:active {
+    transform: scale(0.97);
+}
+
+.ad-message {
+    font-size: 12px;
+    margin-top: 5px;
+    color: #2c2c2c;
+    min-height: 1.5em;
+}
+
+/* التبويبات */
+.tabs {
+    display: flex;
+    justify-content: space-around;
+    background: #1f3b1a;
+    padding: 8px 0 0;
+    flex-wrap: wrap;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    color: #cfcfcf;
+    font-size: 14px;
+    padding: 10px 0;
+    flex: 1;
+    min-width: 70px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: 0.2s;
+    text-align: center;
+}
+
+.tab-btn.active {
+    color: #ffcf4a;
+    border-bottom: 3px solid #ffcf4a;
+    background: #2c5e2a;
+}
+
+/* المحتوى */
+.tab-content {
+    display: none;
+    padding: 15px;
+    background: #2e4a2e;
+    min-height: 400px;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* ========== حقول الزراعة (شبكة 2×2) ========== */
+.fields-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.field-slot {
+    background: #7c5e3a;
+    border-radius: 20px;
+    padding: 20px 5px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff3cf;
+    box-shadow: inset 0 0 6px #2b1e0e, 0 2px 5px black;
+    cursor: pointer;
+    transition: 0.1s;
+    min-height: 85px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.field-slot.empty {
+    background: #9b7652;
+    color: #d4c9a6;
+}
+
+.field-slot.ready {
+    background: #e9b35f;
+    color: #2c2c2c;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); background: #f0c674; }
+    100% { transform: scale(1); }
+}
+
+/* قائمة المحاصيل (أفقية قابلة للالتفاف) */
+.crops-bar h3 {
+    margin: 10px 0 5px;
+    font-size: 16px;
+}
+
+.crops-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0;
+    justify-content: center;
+}
+
+.crop-btn {
+    background: #3f6b3a;
+    padding: 8px 12px;
+    border-radius: 40px;
+    font-size: 12px;
+    font-weight: bold;
+    border: none;
+    color: white;
+    cursor: pointer;
+    transition: 0.1s;
+}
+
+.crop-btn:active {
+    transform: scale(0.95);
+}
+
+/* الحيوانات (قائمة عمودية) */
+.animals-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.animal-card {
+    background: #3f6b3a;
+    padding: 10px;
+    border-radius: 30px;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: 0.1s;
+}
+
+.animal-card:active {
+    transform: scale(0.98);
+}
+
+.buy-animal-btn {
+    background: #6b8c42;
+    display: block;
+    width: 100%;
+    margin: 8px 0;
+    padding: 10px;
+    border-radius: 30px;
+    font-weight: bold;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.buy-animal-btn:active {
+    transform: scale(0.98);
+}
+
+/* السوق (قائمة عمودية) */
+.inventory-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sell-btn {
+    background: #d68b2c;
+    padding: 10px;
+    border-radius: 40px;
+    font-size: 14px;
+    font-weight: bold;
+    border: none;
+    color: white;
+    cursor: pointer;
+    text-align: center;
+}
+
+.sell-btn:active {
+    transform: scale(0.98);
+}
+
+/* أزرار عامة */
+.action-btn {
+    width: 100%;
+    background: #d4a373;
+    border: none;
+    padding: 12px;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 40px;
+    margin-top: 15px;
+    cursor: pointer;
+}
+
+.action-btn:active {
+    transform: scale(0.98);
+}
+
+/* الإحصائيات */
+.stats-details {
+    background: #1f3b1a;
+    padding: 15px;
+    border-radius: 20px;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+/* المهام اليومية (بطاقات جميلة) */
+.tasks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.task-card {
+    background: #1f3b1a;
+    border-radius: 20px;
+    padding: 12px;
+    border-left: 8px solid #e9b35f;
+}
+
+.task-title {
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.task-progress {
+    background: #3b5e2b;
+    border-radius: 20px;
+    height: 18px;
+    width: 100%;
+    margin: 8px 0;
+    overflow: hidden;
+}
+
+.task-progress-fill {
+    background: #ffcf4a;
+    width: 0%;
+    height: 100%;
+    transition: width 0.2s;
+}
+
+.task-status {
+    font-size: 12px;
+    color: #aaf0a0;
+}
+
+/* نافذة اختيار المحصول المنبثقة */
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.popup-inner {
+    background: #3b5e2b;
+    padding: 20px;
+    border-radius: 40px;
+    width: 80%;
+    max-width: 320px;
+    text-align: center;
+    color: white;
+    box-shadow: 0 8px 20px black;
+}
+
+.popup-inner h3 {
+    margin-top: 0;
+}
+
+.popup-crop-btn {
+    display: block;
+    width: 100%;
+    margin: 8px 0;
+    padding: 10px;
+    border-radius: 40px;
+    background: #ffcf4a;
+    border: none;
+    font-weight: bold;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.popup-crop-btn:active {
+    transform: scale(0.97);
+}
+
+.popup-close {
+    margin-top: 15px;
+    background: #8b5a2b;
+    color: white;
+}
+
+/* تحسين للشاشات الصغيرة */
+@media (max-width: 500px) {
+    .stats-bar {
+        font-size: 11px;
+    }
+    .tab-btn {
+        font-size: 12px;
+        padding: 8px 0;
+    }
+    .field-slot {
+        font-size: 12px;
+        padding: 15px 2px;
+        min-height: 75px;
+    }
+    .crop-btn {
+        font-size: 10px;
+        padding: 6px 10px;
+    }
+    .task-title {
+        font-size: 13px;
+    }
+    .animal-card {
+        font-size: 12px;
+    }
+}
