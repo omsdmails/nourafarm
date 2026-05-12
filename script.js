@@ -1,4 +1,4 @@
-// إعداد Supabase (استبدل البيانات التالية بقيم مشروعك)
+// إعداد Supabase (استبدل بقيم مشروعك)
 const SUPABASE_URL = 'https://your-project.supabase.co';
 const SUPABASE_ANON_KEY = 'your-anon-key';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -17,16 +17,23 @@ const RECIPES = {
 };
 
 let currentUser = null;
-let playerData = null;     // { gold, inventory, game_data, game_type }
-let gameInterval = null;
+let playerData = null;
 let currentGameType = 'farm';
 
-// ----- دوال المساعدة -----
-function showScreen(screenId) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    const screen = document.getElementById(screenId);
-    if (screen) screen.classList.add('active');
+// ******* إضافة دالة showMessage (هذا كان مفقوداً) *******
+function showMessage(msg, type) {
+    let msgDiv = document.getElementById('loginMsg'); // نستخدم عنصر عام
+    if (!msgDiv) {
+        // إذا لم يوجد ننشئ واحداً مؤقتاً
+        msgDiv = document.createElement('div');
+        msgDiv.id = 'tempMsg';
+        document.body.appendChild(msgDiv);
+    }
+    msgDiv.innerText = msg;
+    msgDiv.style.color = type === 'error' ? '#ffaaaa' : (type === 'success' ? '#c3ffb3' : '#ffe6a3');
+    setTimeout(() => { if (msgDiv.innerText === msg) msgDiv.innerText = ''; }, 2500);
 }
+// *****************************************************
 
 async function loadUserData() {
     const { data, error } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
@@ -35,12 +42,12 @@ async function loadUserData() {
         playerData = data;
         currentGameType = data.game_type;
     } else {
-        // مستخدم جديد – أنشئ له ملف شخصي
         const newProfile = {
             id: currentUser.id,
             username: currentUser.email.split('@')[0],
             game_type: 'farm',
             gold: 100,
+            score: 0,
             inventory: {},
             game_data: { fields: [null,null,null,null], animals: [] }
         };
@@ -49,7 +56,6 @@ async function loadUserData() {
         playerData = newProfile;
         currentGameType = 'farm';
     }
-    // تأكد من هيكل game_data
     if (!playerData.game_data) playerData.game_data = {};
     if (currentGameType === 'farm' && !playerData.game_data.fields) playerData.game_data.fields = [null,null,null,null];
     if (currentGameType === 'farm' && !playerData.game_data.animals) playerData.game_data.animals = [];
@@ -64,7 +70,6 @@ async function savePlayerData(update) {
     else { if (update.gold !== undefined) playerData.gold = update.gold; }
 }
 
-// ----- دوال المزرعة -----
 function plantCrop(cropKey, fieldIdx) {
     const crop = CROPS[cropKey];
     if (!crop) return;
@@ -92,6 +97,10 @@ function harvestField(idx) {
     } else showMessage('لم ينضج بعد', 'info');
 }
 
+function harvestAll() {
+    for(let i=0;i<4;i++) harvestField(i);
+}
+
 function buyAnimal() {
     const animal = ANIMALS.Chicken;
     if (playerData.gold < animal.price) { showMessage('لا عملات كافية', 'error'); return; }
@@ -117,7 +126,6 @@ function collectAnimal(idx) {
     } else showMessage('انتظر', 'info');
 }
 
-// ----- دوال المطعم (مبسطة)-----
 function cookRecipe(recipeKey) {
     const recipe = RECIPES[recipeKey];
     for (let [ing, qty] of Object.entries(recipe.ingredients)) {
@@ -130,7 +138,6 @@ function cookRecipe(recipeKey) {
     showMessage(`صنعت ${recipe.nameAr} +${recipe.sell}`, 'success');
 }
 
-// ----- السوق المشترك (عرض وشراء) -----
 async function loadMarketListings() {
     const { data, error } = await supabase.from('market_listings').select('*, seller:profiles(username)').eq('status', 'active');
     if (error) { console.error(error); return []; }
@@ -154,14 +161,9 @@ async function createListing(item, qty, price) {
 
 async function buyListing(listing) {
     if (playerData.gold < listing.price_per_unit * listing.quantity) { showMessage('لا عملات كافية', 'error'); return; }
-    // تحديث بيانات البائع والمشتري (بسيط)
-    const { error: updateSeller } = await supabase.from('profiles').select('gold, inventory').eq('id', listing.seller_id).single();
-    if (updateSeller) return;
-    // هنا لسهولة سنقوم بتحويل البيانات محلياً – أفضل عمل transaction لكن نكتفي بهذا للعرض
     showMessage('تم الشراء (نموذج) – سيكتمل لاحقاً', 'success');
 }
 
-// ----- عرض واجهة اللعبة حسب النوع -----
 function renderGameUI() {
     const container = document.getElementById('app');
     if (!container) return;
@@ -178,23 +180,13 @@ function renderGameUI() {
         </div>
     `;
     container.innerHTML = html;
-    // تبويبات ديناميكية
     const tabsContainer = document.getElementById('gameTabs');
     const tabContentDiv = document.getElementById('tabContent');
-    const tabs = [];
-    if (currentGameType === 'farm') {
-        tabs.push({ id: 'farm', name: '🌾 المزرعة' });
-        tabs.push({ id: 'animals', name: '🐔 الحيوانات' });
-        tabs.push({ id: 'market', name: '🛒 السوق المشترك' });
-    } else if (currentGameType === 'restaurant') {
-        tabs.push({ id: 'kitchen', name: '🍳 المطبخ' });
-        tabs.push({ id: 'market', name: '🛒 السوق المشترك' });
-    }
+    const tabs = (currentGameType === 'farm') ? 
+        [{ id: 'farm', name: '🌾 المزرعة' }, { id: 'animals', name: '🐔 الحيوانات' }, { id: 'market', name: '🛒 السوق المشترك' }] :
+        [{ id: 'kitchen', name: '🍳 المطبخ' }, { id: 'market', name: '🛒 السوق المشترك' }];
     let activeTab = tabs[0].id;
-    function switchTab(tabId) {
-        activeTab = tabId;
-        renderTabContent();
-    }
+    function switchTab(tabId) { activeTab = tabId; renderTabContent(); }
     function renderTabContent() {
         if (!tabContentDiv) return;
         if (activeTab === 'farm') {
@@ -216,8 +208,7 @@ function renderGameUI() {
         } else if (activeTab === 'animals') {
             let animalsHtml = '<div class="animals-list">';
             playerData.game_data.animals.forEach((a,idx) => {
-                let animal = ANIMALS.Chicken;
-                let ready = (Date.now() - a.lastCollect) >= animal.interval;
+                let ready = (Date.now() - a.lastCollect) >= ANIMALS.Chicken.interval;
                 animalsHtml += `<div class="animal-card" onclick="window.collectAnimal(${idx})">🐔 دجاجة - ${ready ? 'جاهزة' : 'تنتظر'} 🥚</div>`;
             });
             animalsHtml += `<button class="buy-animal-btn" onclick="window.buyAnimal()">🐔 شراء دجاجة (20)</button></div>`;
@@ -263,7 +254,6 @@ function renderGameUI() {
     document.getElementById('logoutBtn').onclick = () => { supabase.auth.signOut(); location.reload(); };
 }
 
-// ----- شاشات الدخول واختيار اللعبة -----
 async function renderLoginScreen() {
     const container = document.getElementById('app');
     container.innerHTML = `
@@ -337,15 +327,13 @@ async function checkUser() {
     }
 }
 
-// ربط الدوال بالنافذة (للاستدعاء من onclick)
 window.plantCrop = plantCrop;
 window.harvestField = harvestField;
-window.harvestAll = () => { for(let i=0;i<4;i++) harvestField(i); };
+window.harvestAll = harvestAll;
 window.buyAnimal = buyAnimal;
 window.collectAnimal = collectAnimal;
 window.cookRecipe = cookRecipe;
 window.createListing = createListing;
 window.buyListing = buyListing;
 
-// بدء التطبيق
 checkUser();
