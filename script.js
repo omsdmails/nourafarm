@@ -1,3 +1,8 @@
+console.log("Script started");
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+    document.body.innerHTML = '<div style="color:red; padding:20px;">خطأ: ' + msg + '<br>سطر: ' + lineNo + '</div>';
+    return false;
+};
 // إعداد Supabase
 const SUPABASE_URL = 'https://kzheikbpxicoeohapfjb.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_aVm9aZ6W5vYTVvTxo3hucw__uZ06aId';
