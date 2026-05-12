@@ -3,68 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>مزرعة فلس - Palestinian Farm</title>
+    <title>مزرعة فلس - مهام يومية</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="app-container">
-        <!-- رأس اللعبة -->
         <header>
             <div class="lang-switch">
                 <button id="langAr" class="lang-btn active">🇸🇦 عربي</button>
                 <button id="langEn" class="lang-btn">🇬🇧 English</button>
             </div>
             <div class="stats-bar">
-                <div class="stat" data-key="farmCoins">🪙 <span id="farmCoins">0</span> <span id="coinName">عملة المزرعة</span></div>
-                <div class="stat" data-key="level">⭐ المستوى <span id="level">1</span></div>
-                <div class="stat" data-key="score">🏆 النقاط <span id="score">0</span></div>
+                <div class="stat">🪙 <span id="farmCoins">0</span> <span id="coinName">عملة</span></div>
+                <div class="stat">⭐ المستوى <span id="level">1</span></div>
+                <div class="stat">🏆 النقاط <span id="score">0</span></div>
             </div>
         </header>
-
-        <!-- أزرار الإعلانات والعملة -->
+        <!-- إعلان تجريبي -->
         <div class="ad-section">
             <button id="watchAdBtn" class="ad-btn">📺 شاهد إعلان واحصل على 10 عملات</button>
             <div id="adMessage" class="ad-message"></div>
         </div>
-
-        <!-- أزرار التنقل بين الشاشات -->
+        <!-- التبويبات -->
         <div class="tabs">
             <button data-tab="farm" class="tab-btn active">🌾 المزرعة</button>
             <button data-tab="animals" class="tab-btn">🐄 الحيوانات</button>
             <button data-tab="market" class="tab-btn">🛒 السوق</button>
             <button data-tab="stats" class="tab-btn">📊 الإحصائيات</button>
+            <button data-tab="tasks" class="tab-btn">📋 المهام</button>
         </div>
-
-        <!-- شاشة المزرعة -->
+        <!-- مزرعة -->
         <div id="farmTab" class="tab-content active">
             <div class="fields-grid" id="fieldsGrid"></div>
-            <div class="crops-bar">
-                <h3>🌱 زراعة المحاصيل</h3>
-                <div class="crops-list" id="cropsList"></div>
-            </div>
+            <div class="crops-bar"><h3>🌱 زراعة المحاصيل</h3><div class="crops-list" id="cropsList"></div></div>
             <button id="harvestAllBtn" class="action-btn">✂ حصاد الكل</button>
         </div>
-
-        <!-- شاشة الحيوانات -->
+        <!-- حيوانات -->
         <div id="animalsTab" class="tab-content">
             <div class="animals-list" id="animalsList"></div>
             <button id="buyChickenBtn" class="buy-animal-btn">🐔 شراء دجاجة (20 عملة)</button>
             <button id="buyCowBtn" class="buy-animal-btn">🐄 شراء بقرة (50 عملة)</button>
             <button id="buySheepBtn" class="buy-animal-btn">🐑 شراء خروف (40 عملة)</button>
         </div>
-
-        <!-- شاشة السوق -->
+        <!-- سوق -->
         <div id="marketTab" class="tab-content">
             <h3>🛒 بيع محاصيلك ومنتجاتك</h3>
             <div class="inventory-list" id="inventoryList"></div>
         </div>
-
-        <!-- شاشة الإحصائيات -->
+        <!-- إحصائيات -->
         <div id="statsTab" class="tab-content">
             <div class="stats-details" id="statsDetails"></div>
         </div>
+        <!-- مهام يومية -->
+        <div id="tasksTab" class="tab-content">
+            <h3>📋 المهام اليومية</h3>
+            <div id="dailyTasksList" class="tasks-list"></div>
+            <div id="tasksResetMessage" style="font-size:12px; margin-top:10px; color:#ffd966;"></div>
+        </div>
     </div>
-
     <script src="script.js"></script>
 </body>
 </html>
