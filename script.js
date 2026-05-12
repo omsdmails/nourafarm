@@ -6,6 +6,7 @@ const CROPS = {
     "Potato": { nameAr: "بطاطا", nameEn: "Potato", emoji: "🥔", buy: 2, sell: 6, growTime: 6, levelReq: 1 },
     "Corn": { nameAr: "ذرة", nameEn: "Corn", emoji: "🌽", buy: 3, sell: 7, growTime: 8, levelReq: 2 },
 };
+
 const ANIMALS = {
     "Chicken": { nameAr: "دجاجة", nameEn: "Chicken", emoji: "🐔", product: "Egg", productEmoji: "🥚", price: 20, interval: 10000, sellProduct: 3 },
     "Cow": { nameAr: "بقرة", nameEn: "Cow", emoji: "🐄", product: "Milk", productEmoji: "🥛", price: 50, interval: 20000, sellProduct: 8 },
@@ -27,12 +28,11 @@ let player = {
     farmCoins: 50,
     score: 0,
     level: 1,
-    fields: [],
+    fields: [null, null, null, null], // 4 حقول
     animals: [],
     inventory: {},
     totalHarvested: 0,
     language: "ar",
-    // بيانات المهام اليومية
     tasks: {},
     lastTaskReset: Date.now(),
 };
@@ -48,6 +48,7 @@ function loadGame() {
         try {
             const data = JSON.parse(saved);
             player = { ...player, ...data };
+            if (!player.fields) player.fields = [null, null, null, null];
             if (!player.tasks) player.tasks = {};
             if (!player.lastTaskReset) player.lastTaskReset = Date.now();
             checkResetDailyTasks();
@@ -61,9 +62,8 @@ function loadGame() {
 // التحقق من تجديد المهام اليومية (كل 24 ساعة)
 function checkResetDailyTasks() {
     const now = Date.now();
-    const oneDay = 86400000; // 24 ساعة
+    const oneDay = 86400000;
     if (now - player.lastTaskReset >= oneDay) {
-        // تجديد المهام
         player.tasks = {};
         DAILY_TASKS.forEach(task => {
             player.tasks[task.id] = { progress: 0, completed: false };
@@ -72,7 +72,6 @@ function checkResetDailyTasks() {
         saveGame();
         showMessage(t("newTasks", "✨ تم تجديد المهام اليومية!", "✨ Daily tasks reset!"), "success");
     } else {
-        // التأكد من وجود هيكل المهام
         DAILY_TASKS.forEach(task => {
             if (!player.tasks[task.id]) {
                 player.tasks[task.id] = { progress: 0, completed: false };
@@ -111,7 +110,6 @@ function plantCrop(cropKey, fieldIndex) {
     if (player.level < crop.levelReq) { showMessage(`يتطلب مستوى ${crop.levelReq}`, "warning"); return false; }
     player.farmCoins -= crop.buy;
     player.fields[fieldIndex] = { cropKey: cropKey, plantedAt: Date.now() };
-    // تقدم مهمة الزراعة
     addTaskProgress("plant");
     saveGame();
     updateUI();
@@ -140,6 +138,7 @@ function harvestField(index) {
         showMessage(`ينمو بعد ${remain} ثانية`, "info");
     }
 }
+
 function harvestAll() {
     let harvested = 0;
     for (let i = 0; i < player.fields.length; i++) {
@@ -158,8 +157,12 @@ function harvestAll() {
             }
         }
     }
-    if (harvested) { recalcLevel(); updateUI(); showMessage(`حصّدت ${harvested} محصول`, "success"); saveGame(); }
-    else showMessage("لا محاصيل ناضجة", "info");
+    if (harvested) {
+        recalcLevel();
+        updateUI();
+        showMessage(`حصّدت ${harvested} محصول`, "success");
+        saveGame();
+    } else showMessage("لا محاصيل ناضجة", "info");
 }
 
 function buyAnimal(animalKey) {
@@ -171,6 +174,7 @@ function buyAnimal(animalKey) {
     showMessage(`اشتريت ${animal.nameAr}!`, "success");
     saveGame();
 }
+
 function collectAnimal(idx) {
     const anim = player.animals[idx];
     const animal = ANIMALS[anim.type];
@@ -190,6 +194,7 @@ function collectAnimal(idx) {
         showMessage(`جاهز بعد ${remain} ثانية`, "info");
     }
 }
+
 function sellInventoryItem(itemKey) {
     let qty = player.inventory[itemKey] || 0;
     if (qty <= 0) return;
@@ -207,8 +212,10 @@ function sellInventoryItem(itemKey) {
         saveGame();
     }
 }
+
 function watchAd() {
     const btn = document.getElementById("watchAdBtn");
+    if (!btn) return;
     btn.disabled = true;
     btn.innerText = "⏳ جارٍ تشغيل الإعلان...";
     setTimeout(() => {
@@ -222,8 +229,10 @@ function watchAd() {
         showMessage(`شكراً! +${reward} عملة 🎉`, "success");
     }, 1500);
 }
+
 function showMessage(msg, type) {
     const msgDiv = document.getElementById("adMessage");
+    if (!msgDiv) return;
     msgDiv.innerText = msg;
     msgDiv.style.color = type === "error" ? "#ffaaaa" : (type === "success" ? "#c3ffb3" : "#ffe6a3");
     setTimeout(() => { if (msgDiv.innerText === msg) msgDiv.innerText = ""; }, 2500);
@@ -235,83 +244,111 @@ function updateUI() {
     document.getElementById("level").innerText = player.level;
     document.getElementById("score").innerText = player.score;
     document.getElementById("coinName").innerText = player.language === "ar" ? "عملة المزرعة" : "FarmCoin";
-    // حقول الزرع
+
+    // حقول الزراعة
     const fieldsDiv = document.getElementById("fieldsGrid");
-    fieldsDiv.innerHTML = "";
-    for (let i = 0; i < 4; i++) {
-        const f = player.fields[i];
-        let html = `<div class="field-slot empty" data-field-index="${i}">`;
-        if (f) {
-            const crop = CROPS[f.cropKey];
-            const elapsed = (Date.now() - f.plantedAt) / 1000;
-            const ready = elapsed >= crop.growTime;
-            const cropName = player.language === "ar" ? crop.nameAr : crop.nameEn;
-            if (ready) html = `<div class="field-slot ready" data-field-index="${i}">✅ ${crop.emoji} ${cropName}<br><small>جاهز!</small>`;
-            else { let remain = Math.ceil(crop.growTime - elapsed); html = `<div class="field-slot" data-field-index="${i}">🌱 ${crop.emoji} ${cropName}<br><small>${remain} ثانية</small>`; }
-        } else html = `<div class="field-slot empty" data-field-index="${i}">🌾 حقل فارغ<br><small>اضغط للزراعة</small>`;
-        html += `</div>`;
-        fieldsDiv.innerHTML += html;
-    }
-    document.querySelectorAll(".field-slot").forEach(el => {
-        const idx = parseInt(el.dataset.fieldIndex);
-        el.addEventListener("click", (e) => {
-            e.stopPropagation();
-            if (player.fields[idx]) harvestField(idx);
-            else showCropSelectionPopup(idx);
+    if (fieldsDiv) {
+        fieldsDiv.innerHTML = "";
+        for (let i = 0; i < 4; i++) {
+            const f = player.fields[i];
+            let html = `<div class="field-slot empty" data-field-index="${i}">`;
+            if (f) {
+                const crop = CROPS[f.cropKey];
+                const elapsed = (Date.now() - f.plantedAt) / 1000;
+                const ready = elapsed >= crop.growTime;
+                const cropName = player.language === "ar" ? crop.nameAr : crop.nameEn;
+                if (ready) {
+                    html = `<div class="field-slot ready" data-field-index="${i}">✅ ${crop.emoji} ${cropName}<br><small>جاهز!</small>`;
+                } else {
+                    let remain = Math.ceil(crop.growTime - elapsed);
+                    html = `<div class="field-slot" data-field-index="${i}">🌱 ${crop.emoji} ${cropName}<br><small>${remain} ثانية</small>`;
+                }
+            } else {
+                html = `<div class="field-slot empty" data-field-index="${i}">🌾 حقل فارغ<br><small>اضغط للزراعة</small>`;
+            }
+            html += `</div>`;
+            fieldsDiv.innerHTML += html;
+        }
+        document.querySelectorAll(".field-slot").forEach(el => {
+            const idx = parseInt(el.dataset.fieldIndex);
+            el.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (player.fields[idx]) harvestField(idx);
+                else showCropSelectionPopup(idx);
+            });
         });
-    });
+    }
+
     // قائمة المحاصيل
     const cropsContainer = document.getElementById("cropsList");
-    cropsContainer.innerHTML = "";
-    for (let [key, crop] of Object.entries(CROPS)) {
-        if (player.level >= crop.levelReq) {
-            let btn = document.createElement("button");
-            btn.className = "crop-btn";
-            let name = player.language === "ar" ? crop.nameAr : crop.nameEn;
-            btn.innerText = `${crop.emoji} ${name} (${crop.buy} عملة)`;
-            btn.addEventListener("click", () => {
-                let emptyIdx = player.fields.findIndex(f => f === null);
-                if (emptyIdx !== -1) plantCrop(key, emptyIdx);
-                else showMessage("لا حقول فارغة!", "warning");
-            });
-            cropsContainer.appendChild(btn);
+    if (cropsContainer) {
+        cropsContainer.innerHTML = "";
+        for (let [key, crop] of Object.entries(CROPS)) {
+            if (player.level >= crop.levelReq) {
+                let btn = document.createElement("button");
+                btn.className = "crop-btn";
+                let name = player.language === "ar" ? crop.nameAr : crop.nameEn;
+                btn.innerText = `${crop.emoji} ${name} (${crop.buy} عملة)`;
+                btn.addEventListener("click", () => {
+                    let emptyIdx = player.fields.findIndex(f => f === null);
+                    if (emptyIdx !== -1) plantCrop(key, emptyIdx);
+                    else showMessage("لا حقول فارغة!", "warning");
+                });
+                cropsContainer.appendChild(btn);
+            }
         }
     }
-    // حيوانات
+
+    // الحيوانات
     const animalsDiv = document.getElementById("animalsList");
-    animalsDiv.innerHTML = "";
-    player.animals.forEach((anim, idx) => {
-        let animal = ANIMALS[anim.type];
-        let now = Date.now();
-        let ready = (now - anim.lastCollect) >= animal.interval;
-        let status = ready ? "جاهز!" : `${Math.ceil((animal.interval - (now - anim.lastCollect))/1000)} ثانية`;
-        let div = document.createElement("div");
-        div.className = "animal-card";
-        div.innerText = `${animal.emoji} ${player.language === "ar" ? animal.nameAr : animal.nameEn} - ${animal.productEmoji} ${animal.product} : ${status}`;
-        if (ready) div.style.background = "#e9b35f";
-        div.addEventListener("click", () => collectAnimal(idx));
-        animalsDiv.appendChild(div);
-    });
+    if (animalsDiv) {
+        animalsDiv.innerHTML = "";
+        player.animals.forEach((anim, idx) => {
+            let animal = ANIMALS[anim.type];
+            let now = Date.now();
+            let ready = (now - anim.lastCollect) >= animal.interval;
+            let status = ready ? "جاهز!" : `${Math.ceil((animal.interval - (now - anim.lastCollect))/1000)} ثانية`;
+            let div = document.createElement("div");
+            div.className = "animal-card";
+            div.innerText = `${animal.emoji} ${player.language === "ar" ? animal.nameAr : animal.nameEn} - ${animal.productEmoji} ${animal.product} : ${status}`;
+            if (ready) div.style.background = "#e9b35f";
+            div.addEventListener("click", () => collectAnimal(idx));
+            animalsDiv.appendChild(div);
+        });
+    }
+
     // مخزون السوق
     const invDiv = document.getElementById("inventoryList");
-    invDiv.innerHTML = "";
-    for (let [item, qty] of Object.entries(player.inventory)) {
-        if (qty > 0) {
-            let emoji = CROPS[item] ? CROPS[item].emoji : (Object.values(ANIMALS).find(a=>a.product===item)?.productEmoji || "📦");
-            let price = CROPS[item] ? CROPS[item].sell : (Object.values(ANIMALS).find(a=>a.product===item)?.sellProduct || 0);
-            let btn = document.createElement("button");
-            btn.className = "sell-btn";
-            btn.innerText = `${emoji} ${item} (${qty}) - بيع بـ ${price} عملة`;
-            btn.addEventListener("click", () => sellInventoryItem(item));
-            invDiv.appendChild(btn);
+    if (invDiv) {
+        invDiv.innerHTML = "";
+        for (let [item, qty] of Object.entries(player.inventory)) {
+            if (qty > 0) {
+                let emoji = CROPS[item] ? CROPS[item].emoji : (Object.values(ANIMALS).find(a=>a.product===item)?.productEmoji || "📦");
+                let price = CROPS[item] ? CROPS[item].sell : (Object.values(ANIMALS).find(a=>a.product===item)?.sellProduct || 0);
+                let btn = document.createElement("button");
+                btn.className = "sell-btn";
+                btn.innerText = `${emoji} ${item} (${qty}) - بيع بـ ${price} عملة`;
+                btn.addEventListener("click", () => sellInventoryItem(item));
+                invDiv.appendChild(btn);
+            }
         }
     }
-    // إحصائيات
+
+    // الإحصائيات
     const statsDiv = document.getElementById("statsDetails");
-    statsDiv.innerHTML = `<p>👤 ${player.username}</p><p>🪙 ${player.farmCoins}</p><p>⭐ ${player.score}</p><p>🏆 مستوى ${player.level}</p><p>🌾 حصاد: ${player.totalHarvested}</p><p>🐔 حيوانات: ${player.animals.length}</p>`;
+    if (statsDiv) {
+        statsDiv.innerHTML = `<p>👤 ${player.username}</p>
+                              <p>🪙 ${player.farmCoins} ${player.language === "ar" ? "عملة" : "coins"}</p>
+                              <p>⭐ ${player.score} ${player.language === "ar" ? "نقطة" : "points"}</p>
+                              <p>🏆 ${player.language === "ar" ? "مستوى" : "Level"} ${player.level}</p>
+                              <p>🌾 ${player.language === "ar" ? "حصاد" : "Harvested"}: ${player.totalHarvested}</p>
+                              <p>🐔 ${player.language === "ar" ? "حيوانات" : "Animals"}: ${player.animals.length}</p>`;
+    }
+
     // المهام اليومية
     renderDailyTasks();
 }
+
 function renderDailyTasks() {
     const tasksDiv = document.getElementById("dailyTasksList");
     if (!tasksDiv) return;
@@ -345,18 +382,19 @@ function renderDailyTasks() {
         } else msgDiv.innerText = "";
     }
 }
+
+// نافذة اختيار المحصول (باستخدام الكلاسات الجديدة)
 function showCropSelectionPopup(fieldIdx) {
     const popup = document.createElement("div");
     popup.className = "popup-overlay";
-    popup.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; justify-content:center; align-items:center; z-index:1000;";
     const inner = document.createElement("div");
-    inner.style.cssText = "background:#3b5e2b; padding:20px; border-radius:30px; width:80%; max-width:300px; text-align:center;";
-    inner.innerHTML = "<h3>🌾 اختر محصولاً</h3>";
+    inner.className = "popup-inner";
+    inner.innerHTML = `<h3>🌾 ${player.language === "ar" ? "اختر محصولاً" : "Choose a crop"}</h3>`;
     for (let [key, crop] of Object.entries(CROPS)) {
         if (player.level >= crop.levelReq) {
             let btn = document.createElement("button");
-            btn.innerText = `${crop.emoji} ${player.language === "ar" ? crop.nameAr : crop.nameEn} (${crop.buy})`;
-            btn.style.cssText = "display:block; margin:8px auto; padding:8px; border-radius:40px; background:#ffcf4a; border:none;";
+            btn.innerText = `${crop.emoji} ${player.language === "ar" ? crop.nameAr : crop.nameEn} (${crop.buy} ${player.language === "ar" ? "عملة" : "coins"})`;
+            btn.className = "popup-crop-btn";
             btn.onclick = () => {
                 plantCrop(key, fieldIdx);
                 document.body.removeChild(popup);
@@ -365,48 +403,70 @@ function showCropSelectionPopup(fieldIdx) {
         }
     }
     let closeBtn = document.createElement("button");
-    closeBtn.innerText = "إغلاق";
+    closeBtn.innerText = player.language === "ar" ? "إغلاق" : "Close";
+    closeBtn.className = "popup-crop-btn popup-close";
     closeBtn.onclick = () => document.body.removeChild(popup);
     inner.appendChild(closeBtn);
     popup.appendChild(inner);
     document.body.appendChild(popup);
 }
-// تحديث دوري
+
+// تحديث دوري (كل ثانية)
 setInterval(() => { updateUI(); saveGame(); }, 1000);
 
-// أحداث الأزرار
-document.getElementById("watchAdBtn").addEventListener("click", watchAd);
-document.getElementById("harvestAllBtn").addEventListener("click", harvestAll);
-document.getElementById("buyChickenBtn").addEventListener("click", () => buyAnimal("Chicken"));
-document.getElementById("buyCowBtn").addEventListener("click", () => buyAnimal("Cow"));
-document.getElementById("buySheepBtn").addEventListener("click", () => buyAnimal("Sheep"));
-document.querySelectorAll(".tab-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-        let tabId = btn.dataset.tab;
-        document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
-        document.getElementById(`${tabId}Tab`).classList.add("active");
-        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        if (tabId === "tasks") renderDailyTasks();
+// -------------------- أحداث الأزرار --------------------
+document.addEventListener("DOMContentLoaded", () => {
+    const watchAdBtn = document.getElementById("watchAdBtn");
+    if (watchAdBtn) watchAdBtn.addEventListener("click", watchAd);
+    const harvestAllBtn = document.getElementById("harvestAllBtn");
+    if (harvestAllBtn) harvestAllBtn.addEventListener("click", harvestAll);
+    const buyChicken = document.getElementById("buyChickenBtn");
+    if (buyChicken) buyChicken.addEventListener("click", () => buyAnimal("Chicken"));
+    const buyCow = document.getElementById("buyCowBtn");
+    if (buyCow) buyCow.addEventListener("click", () => buyAnimal("Cow"));
+    const buySheep = document.getElementById("buySheepBtn");
+    if (buySheep) buySheep.addEventListener("click", () => buyAnimal("Sheep"));
+
+    // التبويبات
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            let tabId = btn.dataset.tab;
+            document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
+            const activeTab = document.getElementById(`${tabId}Tab`);
+            if (activeTab) activeTab.classList.add("active");
+            document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            if (tabId === "tasks") renderDailyTasks();
+        });
     });
+
+    // تبديل اللغة
+    const langAr = document.getElementById("langAr");
+    const langEn = document.getElementById("langEn");
+    if (langAr) {
+        langAr.addEventListener("click", () => {
+            player.language = "ar";
+            document.documentElement.lang = "ar";
+            document.documentElement.dir = "rtl";
+            langAr.classList.add("active");
+            if (langEn) langEn.classList.remove("active");
+            updateUI();
+            saveGame();
+        });
+    }
+    if (langEn) {
+        langEn.addEventListener("click", () => {
+            player.language = "en";
+            document.documentElement.lang = "en";
+            document.documentElement.dir = "ltr";
+            langEn.classList.add("active");
+            if (langAr) langAr.classList.remove("active");
+            updateUI();
+            saveGame();
+        });
+    }
 });
-// تبديل اللغة
-document.getElementById("langAr").addEventListener("click", () => {
-    player.language = "ar";
-    document.documentElement.lang = "ar";
-    document.documentElement.dir = "rtl";
-    document.getElementById("langAr").classList.add("active");
-    document.getElementById("langEn").classList.remove("active");
-    updateUI();
-});
-document.getElementById("langEn").addEventListener("click", () => {
-    player.language = "en";
-    document.documentElement.lang = "en";
-    document.documentElement.dir = "ltr";
-    document.getElementById("langEn").classList.add("active");
-    document.getElementById("langAr").classList.remove("active");
-    updateUI();
-});
-// تهيئة
+
+// تهيئة اللعبة
 loadGame();
 updateUI();
