@@ -1,104 +1,26 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تسجيل الدخول - المزرعة</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>المزرعة</title>
     <style>
         body { background: #1e3c2c; font-family: Arial; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: #2e4a2e; padding: 30px; border-radius: 20px; color: white; width: 350px; text-align: center; }
-        input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 25px; border: none; font-size: 16px; }
-        button { background: #ffcf4a; font-weight: bold; cursor: pointer; }
-        .error { color: #ffaaaa; background: #6d2e2e; padding: 10px; border-radius: 10px; margin-top: 10px; }
-        .success { color: #aaffaa; background: #2a5a2a; padding: 10px; border-radius: 10px; margin-top: 10px; }
+        .box { background: #2e4a2e; padding: 30px; border-radius: 20px; color: white; text-align: center; }
+        button { background: #ffcf4a; padding: 10px 20px; border: none; border-radius: 20px; cursor: pointer; font-size: 16px; margin: 5px; }
+        input { padding: 10px; margin: 5px; border-radius: 20px; border: none; width: 90%; }
     </style>
 </head>
 <body>
     <div id="app"></div>
     <script>
-        // Supabase configuration
-        const SUPABASE_URL = 'https://kzheikbpxicoeohapfjb.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_aVm9aZ6W5vYTVvTxo3hucw__uZ06aId';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
-        async function checkUser() {
-            const { data: { user } } = await supabase.auth.getUser();
-            
-            if (user) {
-                // User is logged in - show game interface
-                document.getElementById('app').innerHTML = `
-                    <div class="card">
-                        <h2>🌾 مرحباً ${user.email}</h2>
-                        <p>💰 الذهب: 100</p>
-                        <p>⭐ النقاط: 0</p>
-                        <button onclick="logout()">🚪 تسجيل خروج</button>
-                        <hr>
-                        <div style="background:#7c5e3a; padding:15px; border-radius:15px; margin-top:15px;">
-                            🌾 حقول المزرعة<br>
-                            🐔 حيوانات<br>
-                            🛒 السوق المشترك
-                        </div>
-                    </div>
-                `;
-            } else {
-                // Show login form
-                document.getElementById('app').innerHTML = `
-                    <div class="card">
-                        <h2>🌾 المزرعة الكبرى</h2>
-                        <input type="email" id="email" placeholder="البريد الإلكتروني">
-                        <input type="password" id="password" placeholder="كلمة المرور">
-                        <button onclick="signup()">📝 حساب جديد</button>
-                        <button onclick="login()">🔓 تسجيل دخول</button>
-                        <div id="msg"></div>
-                    </div>
-                `;
-            }
-        }
-        
-        async function signup() {
-            const email = document.getElementById('email').value;
-            const pass = document.getElementById('password').value;
-            const msgDiv = document.getElementById('msg');
-            
-            if (pass.length < 6) {
-                msgDiv.innerHTML = '<div class="error">كلمة المرور قصيرة جداً (6 أحرف على الأقل)</div>';
-                return;
-            }
-            
-            const { error } = await supabase.auth.signUp({ email, password: pass });
-            if (error) {
-                msgDiv.innerHTML = `<div class="error">❌ ${error.message}</div>`;
-            } else {
-                msgDiv.innerHTML = '<div class="success">✅ تم التسجيل! افتح بريدك الإلكتروني لتأكيد الحساب، ثم سجل الدخول.</div>';
-            }
-        }
-        
-        async function login() {
-            const email = document.getElementById('email').value;
-            const pass = document.getElementById('password').value;
-            const msgDiv = document.getElementById('msg');
-            
-            const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
-            if (error) {
-                msgDiv.innerHTML = `<div class="error">❌ ${error.message}</div>`;
-            } else {
-                checkUser();
-            }
-        }
-        
-        async function logout() {
-            await supabase.auth.signOut();
-            checkUser();
-        }
-        
-        // Make functions available globally
-        window.signup = signup;
-        window.login = login;
-        window.logout = logout;
-        
-        // Start the app
-        checkUser();
+        // عرض شاشة بسيطة بدون Supabase أولاً
+        document.getElementById('app').innerHTML = `
+            <div class="box">
+                <h1>🌾 المزرعة</h1>
+                <p>إذا رأيت هذا النص، فالمشكلة ليست في الكود</p>
+                <button onclick="alert('الزر يعمل!')">اضغط هنا للاختبار</button>
+            </div>
+        `;
     </script>
 </body>
 </html>
