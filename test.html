@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>اختبار Supabase</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h2>اختبار الاتصال</h2>
+    <div id="result"></div>
+    <script>
+        const SUPABASE_URL = 'https://kzheikbpxicoeohapfjb.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_aVm9aZ6W5vYTVvTxo3hucw__uZ06aId';
+        
+        document.getElementById('result').innerText = 'جاري تحميل المكتبة...';
+        
+        if (typeof window.supabase === 'undefined') {
+            document.getElementById('result').innerHTML = '❌ مكتبة Supabase لم تحمل. تأكد من اتصال الإنترنت.';
+        } else {
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            document.getElementById('result').innerHTML = '✅ المكتبة حملت. جاري اختبار الاتصال...';
+            
+            // اختبار بسيط: محاولة قراءة بيانات الجلسة
+            supabase.auth.getSession().then(({ data, error }) => {
+                if (error) {
+                    document.getElementById('result').innerHTML = '❌ خطأ في الاتصال: ' + error.message;
+                } else {
+                    document.getElementById('result').innerHTML = '✅ الاتصال ناجح. المستخدم: ' + (data.session?.user?.email || 'غير مسجل دخول');
+                }
+            }).catch(err => {
+                document.getElementById('result').innerHTML = '❌ فشل: ' + err.message;
+            });
+        }
+    </script>
+</body>
+</html>

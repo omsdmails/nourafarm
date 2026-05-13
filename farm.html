@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مزرعة السوق المشترك</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1e3c2c; font-family: system-ui; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
+        #app { max-width: 550px; width: 100%; background: #2e4a2e; border-radius: 30px; overflow: hidden; color: #f5f5dc; }
+        .screen { padding: 20px; }
+        .card { background: #1f3b1a; border-radius: 25px; padding: 20px; margin-bottom: 15px; }
+        input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 50px; border: none; font-size: 15px; }
+        button { background: #ffcf4a; color: #1f3b1a; font-weight: bold; cursor: pointer; }
+        .flex { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .error { background: #8b3a3a; padding: 10px; border-radius: 30px; margin-top: 10px; text-align: center; }
+        .success { background: #2a6b2a; padding: 10px; border-radius: 30px; margin-top: 10px; text-align: center; }
+        .listing { background: #2c5e2a; border-radius: 20px; padding: 12px; margin: 10px 0; }
+        hr { margin: 15px 0; border-color: #4f7840; }
+        .field { background: #7c5e3a; border-radius: 20px; padding: 20px; text-align: center; cursor: pointer; }
+        .field.ready { background: #e9b35f; color: #1f3b1a; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="app">⚙️ جاري تحميل المنصة...</div>
+    <script>
+        const SUPABASE_URL = 'https://kzheikbpxicoeohapfjb.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_aVm9aZ6W5vYTVvTxo3hucw__uZ06aId';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        let currentUser = null;
+        let player = null;
+        
+        function showMessage(msg, type) {
+            const msgDiv = document.getElementById('globalMsg');
+            if (msgDiv) {
+                msgDiv.innerText = msg;
+                msgDiv.className = type === 'error' ? 'error' : 'success';
+                setTimeout(() => { if (msgDiv.innerText === msg) msgDiv.innerText = ''; }, 3000);
+            }
+        }
+        
+        async function ensureProfile() {
+            const { data, error } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+            if (error && error.code !== 'PGRST116') throw error;
+            if (data) return data;
+            const newProfile = {
+                id: currentUser.id,
+                username: currentUser.email.split('@')[0],
+                gold: 100,
+                score: 0,
+                inventory: { Wheat: 2, Tomato: 1 },
+                game_data: { field: null }
+            };
+            const { error: insertErr } = await supabase.from('profiles').insert(newProfile);
+            if (insertErr) throw insertErr;
+            return newProfile;
+        }
+        
+        async function loadMarket() {
+            const { data, error } = await supabase.from('market_listings').select('*, seller:profiles(username)').eq('status', 'active');
+            if (error) return [];
+            return data || [];
+        }
+        
+        async function createListing(item, qty, price) {
+            if (!player.inventory[item] || player.inventory[item] < qty) {
+                showMessage('لا تملك الكمية', 'error');
+                return false;
+            }
+            const { error } = await supabase.from('market_listings').insert({
+                seller_id: currentUser.id,
+                item_name: item,
+                quantity: qty,
+                price_per_unit: price
+            });
+            if (error) { showMessage(error.message, 'error'); return false; }
+            player.inventory[item] -= qty;
+            await supabase.from('profiles').update({ inventory: player.inventory }).eq('id', currentUser.id);
+            showMessage(`تم نشر ${qty} ${item}`, 'success');
+            return true;
+        }
+        
+        async function buyListing(listing) {
+            const total = listing.price_per_unit * listing.quantity;
+            if (player.gold < total) { showMessage('ذهب غير كاف', 'error'); return; }
+            // تحديث المشتري
+            player.gold -= total;
+            player.inventory[listing.item_name] = (player.inventory[listing.item_name] || 0) + listing.quantity;
+            await supabase.from('profiles').update({ gold: player.gold, inventory: player.inventory }).eq('id', currentUser.id);
+            // تحديث البائع (تبسيط: نضيف له الذهب فقط)
+            const { data: seller } = await supabase.from('profiles').select('gold').eq('id', listing.seller_id).single();
+            if (seller) {
+                await supabase.from('profiles').update({ gold: seller.gold + total }).eq('id', listing.seller_id);
+            }
+            await supabase.from('market_listings').update({ status: 'sold' }).eq('id', listing.id);
+            showMessage(`اشتريت ${listing.quantity} ${listing.item_name}`, 'success');
+            return true;
+        }
+        
+        async function plantWheat() {
+            if (player.game_data.field) { showMessage('الحقل مشغول', 'error'); return; }
+            if (player.gold < 2) { showMessage('تحتاج 2 ذهب', 'error'); return; }
+            player.gold -= 2;
+            player.game_data.field = { plantedAt: Date.now() };
+            await supabase.from('profiles').update({ gold: player.gold, game_data: player.game_data }).eq('id', currentUser.id);
+            showMessage('زرعت قمحاً!', 'success');
+            renderGame();
+        }
+        
+        async function harvestField() {
+            if (!player.game_data.field) { showMessage('لا شيء في الحقل', 'error'); return; }
+            const elapsed = (Date.now() - player.game_data.field.plantedAt) / 1000;
+            if (elapsed < 5) { showMessage('لم ينضج بعد', 'error'); return; }
+            player.gold += 5;
+            player.inventory.Wheat = (player.inventory.Wheat || 0) + 1;
+            player.game_data.field = null;
+            await supabase.from('profiles').update({ gold: player.gold, inventory: player.inventory, game_data: player.game_data }).eq('id', currentUser.id);
+            showMessage('حصّدت قمحاً +5 ذهب', 'success');
+            renderGame();
+        }
+        
+        function getPrice(item) { return { Wheat: 5, Tomato: 8, Carrot: 4 }[item] || 5; }
+        
+        async function renderGame() {
+            const listings = await loadMarket();
+            const isReady = player.game_data.field ? (Date.now() - player.game_data.field.plantedAt)/1000 >= 5 : false;
+            const fieldHtml = player.game_data.field ?
+                `<div class="field ${isReady ? 'ready' : ''}" onclick="window.harvestField()">
+                    🌾 قمح ${isReady ? 'جاهز ✅' : 'ينمو 🌱'}
+                 </div>` :
+                `<div class="field" onclick="window.plantWheat()">🌾 حقل فارغ (زرع بـ 2 ذهب)</div>`;
+            
+            let invHtml = '<div class="flex">';
+            for (let [item, qty] of Object.entries(player.inventory || {})) {
+                invHtml += `<span>${item}: ${qty}</span>
+                            <button class="sellDirect" data-item="${item}" data-price="${getPrice(item)}" style="width:auto;">بيع 1 بـ ${getPrice(item)}</button><br>`;
+            }
+            invHtml += '</div>';
+            if (Object.keys(player.inventory || {}).length === 0) invHtml = '<p>مخزن فارغ</p>';
+            
+            let marketHtml = listings.length === 0 ? '<p>لا توجد إعلانات</p>' : '';
+            for (let l of listings) {
+                marketHtml += `
+                    <div class="listing">
+                        <div class="flex">
+                            <span>${l.item_name} x${l.quantity}</span>
+                            <span>💰 ${l.price_per_unit}</span>
+                            <span>👤 ${l.seller?.username || 'بائع'}</span>
+                            <button class="buyBtn" data-id="${l.id}" data-price="${l.price_per_unit}" data-qty="${l.quantity}" data-seller="${l.seller_id}" data-item="${l.item_name}" style="width:auto;">شراء</button>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            let itemOptions = '';
+            for (let item of Object.keys(player.inventory || {})) {
+                itemOptions += `<option value="${item}">${item} (${player.inventory[item]})</option>`;
+            }
+            
+            document.getElementById('app').innerHTML = `
+                <div class="screen">
+                    <div class="flex" style="background:#1f3b1a; padding:12px; border-radius:40px;">
+                        <span>💰 ${player.gold} ذهب</span>
+                        <span>⭐ ${player.score || 0}</span>
+                        <span>👤 ${player.username}</span>
+                        <button id="logoutBtn" style="width:auto; background:#8b5a2b;">🚪</button>
+                    </div>
+                    <div class="card">
+                        <h3>🌾 مزرعتي</h3>
+                        ${fieldHtml}
+                    </div>
+                    <div class="card">
+                        <h3>📦 مخزني</h3>
+                        ${invHtml}
+                    </div>
+                    <div class="card">
+                        <h3>🛒 السوق المشترك</h3>
+                        ${marketHtml}
+                    </div>
+                    <div class="card">
+                        <h4>➕ نشر إعلان</h4>
+                        <select id="itemSelect">${itemOptions}</select>
+                        <input type="number" id="qtyInput" placeholder="الكمية">
+                        <input type="number" id="priceInput" placeholder="السعر لكل وحدة">
+                        <button id="publishBtn">نشر</button>
+                    </div>
+                    <div id="globalMsg"></div>
+                </div>
+            `;
+            
+            document.querySelectorAll('.sellDirect').forEach(btn => {
+                btn.onclick = async () => {
+                    const item = btn.dataset.item;
+                    const price = parseInt(btn.dataset.price);
+                    if (player.inventory[item] <= 0) return;
+                    player.inventory[item]--;
+                    player.gold += price;
+                    await supabase.from('profiles').update({ gold: player.gold, inventory: player.inventory }).eq('id', currentUser.id);
+                    renderGame();
+                    showMessage(`بعت ${item} بـ ${price}`, 'success');
+                };
+            });
+            document.querySelectorAll('.buyBtn').forEach(btn => {
+                btn.onclick = async () => {
+                    const listing = {
+                        id: btn.dataset.id,
+                        price_per_unit: parseInt(btn.dataset.price),
+                        quantity: parseInt(btn.dataset.qty),
+                        seller_id: btn.dataset.seller,
+                        item_name: btn.dataset.item
+                    };
+                    await buyListing(listing);
+                    renderGame();
+                };
+            });
+            document.getElementById('publishBtn').onclick = async () => {
+                const item = document.getElementById('itemSelect').value;
+                const qty = parseInt(document.getElementById('qtyInput').value);
+                const price = parseInt(document.getElementById('priceInput').value);
+                if (!qty || !price) { showMessage('املأ الكمية والسعر', 'error'); return; }
+                await createListing(item, qty, price);
+                renderGame();
+            };
+            document.getElementById('logoutBtn').onclick = () => { supabase.auth.signOut(); location.reload(); };
+        }
+        
+        async function renderLogin() {
+            document.getElementById('app').innerHTML = `
+                <div class="screen">
+                    <div class="card">
+                        <h2>🌾 منصة المزارع</h2>
+                        <input type="email" id="email" placeholder="البريد">
+                        <input type="password" id="password" placeholder="كلمة السر">
+                        <button id="loginBtn">دخول</button>
+                        <button id="signupBtn">تسجيل جديد</button>
+                        <div id="loginMsg"></div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('loginBtn').onclick = async () => {
+                const email = document.getElementById('email').value;
+                const pass = document.getElementById('password').value;
+                const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+                if (error) document.getElementById('loginMsg').innerHTML = `<div class="error">${error.message}</div>`;
+                else startSession();
+            };
+            document.getElementById('signupBtn').onclick = async () => {
+                const email = document.getElementById('email').value;
+                const pass = document.getElementById('password').value;
+                const { error } = await supabase.auth.signUp({ email, password: pass });
+                if (error) document.getElementById('loginMsg').innerHTML = `<div class="error">${error.message}</div>`;
+                else document.getElementById('loginMsg').innerHTML = '<div class="success">تم التسجيل، سجل الدخول</div>';
+            };
+        }
+        
+        async function startSession() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) { renderLogin(); return; }
+            currentUser = user;
+            try {
+                player = await ensureProfile();
+                renderGame();
+            } catch(err) {
+                document.getElementById('app').innerHTML = `<div class="screen"><div class="error">خطأ: ${err.message}</div></div>`;
+            }
+        }
+        
+        window.plantWheat = plantWheat;
+        window.harvestField = harvestField;
+        startSession();
+    </script>
+</body>
+</html>

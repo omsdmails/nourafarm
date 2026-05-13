@@ -3,12 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>منصة المزرعة والمطعم | سوق مشترك</title>
-    <link rel="stylesheet" href="style.css">
+    <title>مزرعة السوق المشترك</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1e3c2c; font-family: system-ui, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
+        #app { max-width: 550px; width: 100%; background: #2e4a2e; border-radius: 30px; overflow: hidden; color: #f5f5dc; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .screen { padding: 20px; }
+        .card { background: #1f3b1a; border-radius: 25px; padding: 20px; margin-bottom: 15px; }
+        input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 50px; border: none; font-size: 15px; }
+        button { background: #ffcf4a; color: #1f3b1a; font-weight: bold; cursor: pointer; transition: 0.1s; }
+        button:active { transform: scale(0.97); }
+        .flex { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .listing { background: #2c5e2a; border-radius: 20px; padding: 12px; margin: 10px 0; }
+        .error { background: #8b3a3a; padding: 10px; border-radius: 30px; margin-top: 10px; text-align: center; }
+        .success { background: #2a6b2a; padding: 10px; border-radius: 30px; margin-top: 10px; text-align: center; }
+        .field { background: #7c5e3a; border-radius: 20px; padding: 20px; text-align: center; cursor: pointer; }
+        .field.ready { background: #e9b35f; color: #1f3b1a; font-weight: bold; }
+        hr { border-color: #4f7840; margin: 15px 0; }
+    </style>
 </head>
 <body>
-    <div id="app"></div>
+    <div id="app">⚙️ جاري التحميل...</div>
     <script src="script.js"></script>
 </body>
 </html>

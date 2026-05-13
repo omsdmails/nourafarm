@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>المزرعة المحلية - تجربة السوق</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1e3c2c; font-family: system-ui; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
+        #app { max-width: 550px; width: 100%; background: #2e4a2e; border-radius: 30px; overflow: hidden; color: #f5f5dc; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .screen { padding: 20px; }
+        .card { background: #1f3b1a; border-radius: 25px; padding: 20px; margin-bottom: 15px; }
+        input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 50px; border: none; font-size: 15px; }
+        button { background: #ffcf4a; color: #1f3b1a; font-weight: bold; cursor: pointer; transition: 0.1s; }
+        button:active { transform: scale(0.97); }
+        .flex { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .listing { background: #2c5e2a; border-radius: 20px; padding: 12px; margin: 10px 0; }
+        .error { background: #8b3a3a; padding: 10px; border-radius: 30px; margin-top: 10px; text-align: center; }
+        .success { background: #2a6b2a; padding: 10px; border-radius: 30px; margin-top: 10px; text-align: center; }
+        .field { background: #7c5e3a; border-radius: 20px; padding: 20px; text-align: center; cursor: pointer; }
+        .field.ready { background: #e9b35f; color: #1f3b1a; font-weight: bold; }
+        hr { border-color: #4f7840; margin: 15px 0; }
+        .tab-btn { background: #3b5e2b; color: white; flex: 1; text-align: center; }
+        .tab-btn.active { background: #ffcf4a; color: #1f3b1a; }
+        .tabs { display: flex; gap: 6px; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <div id="app">⚙️ جاري التحميل...</div>
+    <script>
+        // -------------------- بيانات افتراضية (بدون سيرفر) --------------------
+        let currentUser = 'مزارع';
+        let gold = 100;
+        let inventory = { Wheat: 5, Tomato: 3, Carrot: 2 };
+        let marketListings = [
+            { id: 1, seller: 'مزارع1', item: 'Wheat', quantity: 10, price: 4 },
+            { id: 2, seller: 'طباخ', item: 'Tomato', quantity: 5, price: 6 },
+            { id: 3, seller: 'تاجر', item: 'Egg', quantity: 8, price: 3 }
+        ];
+        let myField = null;  // { crop: 'Wheat', plantedAt: Date, ready: false }
+        
+        // حفظ البيانات
+        function saveData() {
+            localStorage.setItem('localFarm', JSON.stringify({ gold, inventory, marketListings, myField, currentUser }));
+        }
+        
+        function loadData() {
+            const saved = localStorage.getItem('localFarm');
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    gold = data.gold;
+                    inventory = data.inventory;
+                    marketListings = data.marketListings;
+                    myField = data.myField;
+                    currentUser = data.currentUser;
+                } catch(e) {}
+            }
+        }
+        
+        function showMessage(msg, type) {
+            const msgDiv = document.getElementById('globalMsg');
+            if (msgDiv) {
+                msgDiv.innerText = msg;
+                msgDiv.className = type === 'error' ? 'error' : 'success';
+                setTimeout(() => { if (msgDiv.innerText === msg) msgDiv.innerText = ''; }, 3000);
+            }
+        }
+        
+        // زراعة
+        function plantWheat() {
+            if (myField) { showMessage('الحقل مشغول! احصد أولاً', 'error'); return; }
+            if (gold < 2) { showMessage('لا تملك 2 ذهب', 'error'); return; }
+            gold -= 2;
+            myField = { crop: 'Wheat', plantedAt: Date.now() };
+            saveData();
+            renderGame();
+            showMessage('زرعت قمحاً! سينضج بعد 5 ثوانٍ', 'success');
+        }
+        
+        function harvestField() {
+            if (!myField) { showMessage('لا يوجد محصول في الحقل', 'error'); return; }
+            const elapsed = (Date.now() - myField.plantedAt) / 1000;
+            if (elapsed < 5) { showMessage('القمح لم ينضج بعد', 'error'); return; }
+            gold += 5;
+            inventory.Wheat = (inventory.Wheat || 0) + 1;
+            myField = null;
+            saveData();
+            renderGame();
+            showMessage('حصّدت قمحاً! +5 ذهب', 'success');
+        }
+        
+        // بيع مباشر
+        function sellDirect(item) {
+            const price = { Wheat: 5, Tomato: 8, Carrot: 4, Egg: 3 }[item] || 5;
+            if (!inventory[item] || inventory[item] <= 0) { showMessage('لا تملك هذا المنتج', 'error'); return; }
+            inventory[item]--;
+            gold += price;
+            saveData();
+            renderGame();
+            showMessage(`بعت ${item} بـ ${price} ذهب`, 'success');
+        }
+        
+        // شراء من السوق
+        function buyListing(listingId) {
+            const listing = marketListings.find(l => l.id === listingId);
+            if (!listing) return;
+            const total = listing.price * listing.quantity;
+            if (gold < total) { showMessage('لا تملك ذهباً كافياً', 'error'); return; }
+            gold -= total;
+            inventory[listing.item] = (inventory[listing.item] || 0) + listing.quantity;
+            marketListings = marketListings.filter(l => l.id !== listingId);
+            saveData();
+            renderGame();
+            showMessage(`اشتريت ${listing.quantity} ${listing.item} بـ ${total} ذهب`, 'success');
+        }
+        
+        // نشر إعلان
+        function publishListing(item, qty, price) {
+            if (!inventory[item] || inventory[item] < qty) { showMessage('لا تملك الكمية الكافية', 'error'); return; }
+            inventory[item] -= qty;
+            const newId = Date.now();
+            marketListings.push({ id: newId, seller: currentUser, item: item, quantity: qty, price: price });
+            saveData();
+            renderGame();
+            showMessage(`تم نشر ${qty} ${item} للبيع`, 'success');
+        }
+        
+        // عرض الواجهة
+        function renderGame() {
+            const fieldReady = myField ? (Date.now() - myField.plantedAt)/1000 >= 5 : false;
+            const fieldHtml = myField ? 
+                `<div class="field ${fieldReady ? 'ready' : ''}" onclick="window.harvestField()">
+                    🌾 قمح ${fieldReady ? '✅ جاهز' : '🌱 ينمو'}
+                 </div>` :
+                `<div class="field" onclick="window.plantWheat()">🌾 حقل فارغ (زراعة قمح بـ 2 ذهب)</div>`;
+            
+            let invHtml = '<div class="flex">';
+            for (let [item, qty] of Object.entries(inventory)) {
+                if (qty > 0) {
+                    const price = { Wheat: 5, Tomato: 8, Carrot: 4, Egg: 3 }[item] || 5;
+                    invHtml += `<span>${item}: ${qty}</span>
+                                <button class="sellDirect" data-item="${item}" style="width:auto;">بيع 1 بـ ${price}</button><br>`;
+                }
+            }
+            invHtml += '</div>';
+            if (Object.keys(inventory).filter(k => inventory[k] > 0).length === 0) invHtml = '<p>مخزن فارغ</p>';
+            
+            let marketHtml = '';
+            for (let l of marketListings) {
+                marketHtml += `
+                    <div class="listing">
+                        <div class="flex">
+                            <span>${l.item} x${l.quantity}</span>
+                            <span>💰 ${l.price} لكل وحدة</span>
+                            <span>👤 ${l.seller}</span>
+                            <button class="buyBtn" data-id="${l.id}" style="width:auto;">شراء</button>
+                        </div>
+                    </div>
+                `;
+            }
+            if (marketListings.length === 0) marketHtml = '<p>لا توجد إعلانات</p>';
+            
+            let itemOptions = '';
+            for (let item of Object.keys(inventory)) {
+                if (inventory[item] > 0) itemOptions += `<option value="${item}">${item} (${inventory[item]})</option>`;
+            }
+            
+            document.getElementById('app').innerHTML = `
+                <div class="screen">
+                    <div class="flex" style="background:#1f3b1a; padding:12px; border-radius:40px;">
+                        <span>💰 ${gold} ذهب</span>
+                        <span>⭐ 0</span>
+                        <span>👤 ${currentUser}</span>
+                        <button id="resetBtn" style="width:auto; background:#8b5a2b;">🔄 إعادة</button>
+                    </div>
+                    <div class="card">
+                        <h3>🌾 مزرعتي</h3>
+                        ${fieldHtml}
+                    </div>
+                    <div class="card">
+                        <h3>📦 مخزني</h3>
+                        ${invHtml}
+                    </div>
+                    <div class="card">
+                        <h3>🛒 السوق المشترك</h3>
+                        ${marketHtml}
+                    </div>
+                    <div class="card">
+                        <h4>➕ نشر إعلان جديد</h4>
+                        <select id="itemSelect">${itemOptions}</select>
+                        <input type="number" id="qtyInput" placeholder="الكمية">
+                        <input type="number" id="priceInput" placeholder="السعر لكل وحدة">
+                        <button id="publishBtn">📢 نشر</button>
+                    </div>
+                    <div id="globalMsg"></div>
+                </div>
+            `;
+            
+            document.querySelectorAll('.sellDirect').forEach(btn => {
+                btn.onclick = () => sellDirect(btn.dataset.item);
+            });
+            document.querySelectorAll('.buyBtn').forEach(btn => {
+                btn.onclick = () => buyListing(parseInt(btn.dataset.id));
+            });
+            document.getElementById('publishBtn').onclick = () => {
+                const item = document.getElementById('itemSelect').value;
+                const qty = parseInt(document.getElementById('qtyInput').value);
+                const price = parseInt(document.getElementById('priceInput').value);
+                if (!qty || !price) { showMessage('املأ الكمية والسعر', 'error'); return; }
+                publishListing(item, qty, price);
+            };
+            document.getElementById('resetBtn').onclick = () => {
+                localStorage.removeItem('localFarm');
+                location.reload();
+            };
+        }
+        
+        function start() {
+            loadData();
+            renderGame();
+        }
+        
+        window.plantWheat = plantWheat;
+        window.harvestField = harvestField;
+        
+        start();
+    </script>
+</body>
+</html>
