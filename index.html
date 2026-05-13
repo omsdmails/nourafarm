@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>المزرعة الكبرى | سوق مشترك</title>
+    <title>المزرعة الكبرى | حيوانات + سوق مشترك</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: linear-gradient(145deg, #1e3c2c 0%, #2a5a3a 100%); font-family: system-ui, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
-        #app { max-width: 650px; width: 100%; background: #2e4a2e; border-radius: 35px; overflow: hidden; color: #f5f5dc; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
+        #app { max-width: 700px; width: 100%; background: #2e4a2e; border-radius: 35px; overflow: hidden; color: #f5f5dc; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
         .screen { padding: 20px; }
         .card { background: #1f3b1a; border-radius: 25px; padding: 18px; margin-bottom: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
         input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 50px; border: none; font-size: 14px; }
@@ -16,21 +16,25 @@
         button:active { transform: scale(0.97); }
         .flex { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
         .fields-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 15px 0; }
-        .field { background: #7c5e3a; border-radius: 20px; padding: 15px; text-align: center; cursor: pointer; transition: 0.1s; min-height: 110px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .field { background: #7c5e3a; border-radius: 20px; padding: 12px; text-align: center; cursor: pointer; transition: 0.1s; min-height: 110px; }
         .field.ready { background: #e9b35f; color: #1f3b1a; box-shadow: 0 0 0 2px gold; }
         .field.empty { background: #9b7652; }
-        .crop-select { background: #2c5e2a; border-radius: 15px; padding: 10px; margin-top: 10px; }
-        .crop-btn { background: #3f6b3a; margin: 4px; padding: 6px 10px; border-radius: 25px; font-size: 12px; border: none; color: white; cursor: pointer; }
+        .crop-select { background: #2c5e2a; border-radius: 15px; padding: 8px; margin-top: 8px; }
+        .crop-btn { background: #3f6b3a; margin: 3px; padding: 5px 8px; border-radius: 20px; font-size: 11px; border: none; color: white; cursor: pointer; }
+        .animal-card { background: #2c5e2a; border-radius: 20px; padding: 12px; margin: 10px 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; cursor: pointer; }
+        .animal-card.ready { background: #e9b35f; color: #1f3b1a; }
         .listing { background: #2c5e2a; border-radius: 20px; padding: 12px; margin: 10px 0; }
         .error { background: #8b3a3a; padding: 10px; border-radius: 25px; text-align: center; }
         .success { background: #2a6b2a; padding: 10px; border-radius: 25px; text-align: center; }
         hr { border-color: #4f7840; margin: 12px 0; }
-        .quality-gold { color: #ffd966; font-size: 11px; }
         .inventory-item { background: #3b5e2b; border-radius: 30px; padding: 5px 12px; display: inline-block; margin: 4px; }
-        .tab-btn { background: #3b5e2b; color: white; flex: 1; text-align: center; padding: 10px; border-radius: 40px; cursor: pointer; }
+        .tab-btn { background: #3b5e2b; color: white; flex: 1; text-align: center; padding: 10px; border-radius: 40px; cursor: pointer; margin: 0 3px; }
         .tab-btn.active { background: #ffcf4a; color: #1f3b1a; }
-        .tabs { display: flex; gap: 8px; margin-bottom: 15px; }
+        .tabs { display: flex; gap: 5px; margin-bottom: 15px; flex-wrap: wrap; }
         h3 { margin-bottom: 10px; font-size: 18px; border-right: 4px solid #ffcf4a; padding-right: 10px; }
+        .progress-bar { background: #4f7840; height: 4px; border-radius: 4px; margin-top: 5px; overflow: hidden; }
+        .progress-fill { background: #ffcf4a; height: 100%; width: 0%; transition: width 0.3s; }
+        .buy-animal-btn { background: #6b8c42; margin: 5px 0; }
     </style>
 </head>
 <body>
@@ -43,23 +47,26 @@
 
         // ---------- بيانات المحاصيل ----------
         const CROPS = {
-            Wheat: { nameAr: "قمح", emoji: "🌾", buyPrice: 2, sellPrice: 5, growTime: 5, quality: "normal" },
-            Tomato: { nameAr: "طماطم", emoji: "🍅", buyPrice: 3, sellPrice: 8, growTime: 7, quality: "normal" },
-            Carrot: { nameAr: "جزر", emoji: "🥕", buyPrice: 1, sellPrice: 4, growTime: 4, quality: "normal" },
-            Potato: { nameAr: "بطاطا", emoji: "🥔", buyPrice: 2, sellPrice: 6, growTime: 6, quality: "normal" },
-            Pepper: { nameAr: "فلفل", emoji: "🌶️", buyPrice: 4, sellPrice: 10, growTime: 9, quality: "normal" },
-            Cucumber: { nameAr: "خيار", emoji: "🥒", buyPrice: 3, sellPrice: 7, growTime: 6, quality: "normal" },
-            Onion: { nameAr: "بصل", emoji: "🧅", buyPrice: 2, sellPrice: 5, growTime: 5, quality: "normal" },
-            Strawberry: { nameAr: "فراولة", emoji: "🍓", buyPrice: 5, sellPrice: 12, growTime: 10, quality: "gold" },
-            Watermelon: { nameAr: "بطيخ", emoji: "🍉", buyPrice: 8, sellPrice: 20, growTime: 12, quality: "gold" },
-            Corn: { nameAr: "ذرة", emoji: "🌽", buyPrice: 3, sellPrice: 7, growTime: 8, quality: "normal" }
+            Wheat: { nameAr: "قمح", emoji: "🌾", buyPrice: 2, sellPrice: 5, growTime: 5 },
+            Tomato: { nameAr: "طماطم", emoji: "🍅", buyPrice: 3, sellPrice: 8, growTime: 7 },
+            Carrot: { nameAr: "جزر", emoji: "🥕", buyPrice: 1, sellPrice: 4, growTime: 4 },
+            Potato: { nameAr: "بطاطا", emoji: "🥔", buyPrice: 2, sellPrice: 6, growTime: 6 },
+            Pepper: { nameAr: "فلفل", emoji: "🌶️", buyPrice: 4, sellPrice: 10, growTime: 9 },
+            Strawberry: { nameAr: "فراولة", emoji: "🍓", buyPrice: 5, sellPrice: 12, growTime: 10 },
+            Corn: { nameAr: "ذرة", emoji: "🌽", buyPrice: 3, sellPrice: 7, growTime: 8 }
+        };
+
+        // ---------- بيانات الحيوانات ----------
+        const ANIMALS = {
+            Chicken: { nameAr: "دجاجة", emoji: "🐔", product: "Egg", productEmoji: "🥚", price: 20, interval: 10000, sellProduct: 3 },
+            Cow: { nameAr: "بقرة", emoji: "🐄", product: "Milk", productEmoji: "🥛", price: 50, interval: 20000, sellProduct: 8 },
+            Sheep: { nameAr: "غنم", emoji: "🐑", product: "Wool", productEmoji: "🧶", price: 40, interval: 15000, sellProduct: 6 }
         };
 
         let currentUser = null;
         let profile = null;
         let activeTab = 'farm';
 
-        // ---------- دوال مساعدة ----------
         function showMessage(msg, type) {
             const msgDiv = document.getElementById('globalMsg');
             if (msgDiv) {
@@ -68,7 +75,6 @@
             }
         }
 
-        // ---------- إنشاء ملف اللاعب ----------
         async function ensureProfile() {
             const { data, error } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
             if (error && error.code !== 'PGRST116') throw error;
@@ -79,13 +85,13 @@
                 gold: 150,
                 score: 0,
                 inventory: { Wheat: 5, Tomato: 3, Carrot: 2 },
-                game_data: { fields: [null, null, null, null] }  // 4 حقول
+                game_data: { fields: [null, null, null, null], animals: [] }
             };
             await supabase.from('profiles').insert(newProfile);
             return newProfile;
         }
 
-        // ---------- زراعة محصول في حقل معين ----------
+        // ---------- المحاصيل ----------
         async function plantCrop(cropKey, fieldIndex) {
             if (profile.game_data.fields[fieldIndex]) {
                 showMessage('هذا الحقل مشغول! احصد أولاً', 'error');
@@ -100,59 +106,75 @@
             profile.game_data.fields[fieldIndex] = { crop: cropKey, plantedAt: Date.now() };
             await supabase.from('profiles').update({ gold: profile.gold, game_data: profile.game_data }).eq('id', currentUser.id);
             renderGame();
-            showMessage(`زرعت ${crop.emoji} ${crop.nameAr}! سينضج بعد ${crop.growTime} ثوانٍ`, 'success');
+            showMessage(`زرعت ${crop.emoji} ${crop.nameAr}!`, 'success');
         }
 
-        // ---------- حصاد محصول من حقل ----------
         async function harvestField(fieldIndex) {
             const field = profile.game_data.fields[fieldIndex];
-            if (!field) {
-                showMessage('لا يوجد محصول في هذا الحقل', 'error');
-                return;
-            }
+            if (!field) { showMessage('لا يوجد محصول في هذا الحقل', 'error'); return; }
             const crop = CROPS[field.crop];
             const elapsed = (Date.now() - field.plantedAt) / 1000;
             if (elapsed < crop.growTime) {
                 const remaining = Math.ceil(crop.growTime - elapsed);
-                showMessage(`لم ينضج ${crop.nameAr} بعد! يتبقى ${remaining} ثوانٍ`, 'error');
+                showMessage(`لم ينضج ${crop.nameAr} بعد!`, 'error');
                 return;
             }
-            // حساب الجودة (إذا حصد مبكراً قبل 20% من الوقت الإضافي)
-            let quality = 'normal';
-            let sellPrice = crop.sellPrice;
-            if (crop.quality === 'gold' && elapsed >= crop.growTime * 1.5) {
-                quality = 'gold';
-                sellPrice = Math.floor(crop.sellPrice * 1.5);
-            }
-            profile.gold += sellPrice;
+            profile.gold += crop.sellPrice;
             profile.score = (profile.score || 0) + 1;
-            const itemKey = quality === 'gold' ? `${field.crop}_Gold` : field.crop;
-            profile.inventory[itemKey] = (profile.inventory[itemKey] || 0) + 1;
+            profile.inventory[field.crop] = (profile.inventory[field.crop] || 0) + 1;
             profile.game_data.fields[fieldIndex] = null;
             await supabase.from('profiles').update({ gold: profile.gold, score: profile.score, inventory: profile.inventory, game_data: profile.game_data }).eq('id', currentUser.id);
             renderGame();
-            showMessage(`حصّدت ${crop.emoji} ${crop.nameAr} ${quality === 'gold' ? '✨ ذهبي ✨' : ''} +${sellPrice} ذهب!`, 'success');
+            showMessage(`حصّدت ${crop.emoji} ${crop.nameAr} +${crop.sellPrice} ذهب!`, 'success');
         }
 
-        // ---------- بيع مباشر من المخزون ----------
+        // ---------- الحيوانات ----------
+        async function buyAnimal(animalKey) {
+            const animal = ANIMALS[animalKey];
+            if (profile.gold < animal.price) {
+                showMessage(`تحتاج ${animal.price} ذهب لشراء ${animal.nameAr}`, 'error');
+                return;
+            }
+            profile.gold -= animal.price;
+            profile.game_data.animals.push({ type: animalKey, lastCollect: Date.now() - animal.interval });
+            await supabase.from('profiles').update({ gold: profile.gold, game_data: profile.game_data }).eq('id', currentUser.id);
+            renderGame();
+            showMessage(`اشتريت ${animal.emoji} ${animal.nameAr}!`, 'success');
+        }
+
+        async function collectAnimal(animalIndex) {
+            const animalData = profile.game_data.animals[animalIndex];
+            const animal = ANIMALS[animalData.type];
+            const now = Date.now();
+            if (now - animalData.lastCollect >= animal.interval) {
+                const product = animal.product;
+                profile.inventory[product] = (profile.inventory[product] || 0) + 1;
+                profile.gold += animal.sellProduct;
+                profile.score = (profile.score || 0) + 1;
+                animalData.lastCollect = now;
+                await supabase.from('profiles').update({ gold: profile.gold, score: profile.score, inventory: profile.inventory, game_data: profile.game_data }).eq('id', currentUser.id);
+                renderGame();
+                showMessage(`جمعت ${animal.productEmoji} ${product} +${animal.sellProduct} ذهب!`, 'success');
+            } else {
+                const remaining = Math.ceil((animal.interval - (now - animalData.lastCollect)) / 1000);
+                showMessage(`جاهز بعد ${remaining} ثانية`, 'error');
+            }
+        }
+
+        // ---------- البيع المباشر والسوق ----------
         async function sellDirect(itemKey) {
-            let baseItem = itemKey.replace('_Gold', '');
-            let crop = CROPS[baseItem];
-            if (!crop) return;
-            let isGold = itemKey.includes('_Gold');
-            let price = isGold ? Math.floor(crop.sellPrice * 1.5) : crop.sellPrice;
+            let sellPrice = CROPS[itemKey]?.sellPrice || (itemKey === 'Egg' ? 3 : (itemKey === 'Milk' ? 8 : (itemKey === 'Wool' ? 6 : 5)));
             if (!profile.inventory[itemKey] || profile.inventory[itemKey] <= 0) {
                 showMessage('لا تملك هذا المنتج', 'error');
                 return;
             }
             profile.inventory[itemKey]--;
-            profile.gold += price;
+            profile.gold += sellPrice;
             await supabase.from('profiles').update({ gold: profile.gold, inventory: profile.inventory }).eq('id', currentUser.id);
             renderGame();
-            showMessage(`بعت ${itemKey} بـ ${price} ذهب`, 'success');
+            showMessage(`بعت ${itemKey} بـ ${sellPrice} ذهب`, 'success');
         }
 
-        // ---------- السوق المشترك ----------
         async function loadMarketListings() {
             const { data, error } = await supabase.from('market_listings').select('*, seller:profiles(username)').eq('status', 'active').order('listed_at', { ascending: false });
             if (error) return [];
@@ -192,48 +214,70 @@
         async function renderGame() {
             const listings = await loadMarketListings();
             
-            // بناء الحقول
+            // الحقول
             let fieldsHtml = '<div class="fields-grid">';
             for (let i = 0; i < 4; i++) {
                 const field = profile.game_data.fields[i];
                 if (field) {
                     const crop = CROPS[field.crop];
                     const elapsed = (Date.now() - field.plantedAt) / 1000;
-                    const isReady = elapsed >= crop.growTime;
                     const percent = Math.min(100, (elapsed / crop.growTime) * 100);
+                    const ready = elapsed >= crop.growTime;
                     fieldsHtml += `
-                        <div class="field ${isReady ? 'ready' : ''}" onclick="window.harvestField(${i})">
+                        <div class="field ${ready ? 'ready' : ''}" onclick="window.harvestField(${i})">
                             <div style="font-size:32px;">${crop.emoji}</div>
                             <div>${crop.nameAr}</div>
-                            <div style="font-size:11px;">${isReady ? '✅ جاهز للحصاد' : `🌱 ينمو (${Math.ceil(crop.growTime - elapsed)} ثانية)`}</div>
-                            <div style="background:#4f7840; height:4px; width:100%; border-radius:4px; margin-top:5px;"><div style="background:#ffcf4a; width:${percent}%; height:4px; border-radius:4px;"></div></div>
+                            <div class="progress-bar"><div class="progress-fill" style="width:${percent}%;"></div></div>
+                            <div style="font-size:11px;">${ready ? '✅ جاهز' : `${Math.ceil(crop.growTime - elapsed)} ثانية`}</div>
                         </div>
                     `;
                 } else {
-                    // حقل فارغ - عرض أزرار المحاصيل
-                    let cropButtons = '';
+                    let cropBtns = '';
                     for (let [key, crop] of Object.entries(CROPS)) {
-                        cropButtons += `<button class="crop-btn" onclick="window.plantCrop('${key}', ${i})">${crop.emoji} ${crop.nameAr} (${crop.buyPrice})</button>`;
+                        cropBtns += `<button class="crop-btn" onclick="window.plantCrop('${key}', ${i})">${crop.emoji} ${crop.nameAr} (${crop.buyPrice})</button>`;
                     }
-                    fieldsHtml += `<div class="field empty" style="cursor:default;"><div style="font-size:32px;">🌾</div><div>حقل فارغ</div><div class="crop-select">${cropButtons}</div></div>`;
+                    fieldsHtml += `<div class="field empty" style="cursor:default;"><div style="font-size:32px;">🌾</div><div>حقل فارغ</div><div class="crop-select">${cropBtns}</div></div>`;
                 }
             }
             fieldsHtml += '</div>';
             
-            // بناء المخزون
+            // الحيوانات
+            let animalsHtml = '';
+            for (let i = 0; i < profile.game_data.animals.length; i++) {
+                const animalData = profile.game_data.animals[i];
+                const animal = ANIMALS[animalData.type];
+                const now = Date.now();
+                const ready = (now - animalData.lastCollect) >= animal.interval;
+                const remaining = Math.ceil((animal.interval - (now - animalData.lastCollect)) / 1000);
+                animalsHtml += `
+                    <div class="animal-card ${ready ? 'ready' : ''}" onclick="window.collectAnimal(${i})">
+                        <span>${animal.emoji} ${animal.nameAr}</span>
+                        <span>${animal.productEmoji} ${animal.product}</span>
+                        <span>${ready ? '✅ جاهز' : `⏳ ${remaining} ثانية`}</span>
+                    </div>
+                `;
+            }
+            if (profile.game_data.animals.length === 0) animalsHtml = '<p>لا توجد حيوانات. اشترِ حيواناً!</p>';
+            
+            // شراء حيوانات جديدة
+            let buyAnimalsHtml = '';
+            for (let [key, animal] of Object.entries(ANIMALS)) {
+                buyAnimalsHtml += `<button class="buy-animal-btn" onclick="window.buyAnimal('${key}')">${animal.emoji} شراء ${animal.nameAr} (${animal.price} ذهب)</button>`;
+            }
+            
+            // المخزون
             let invHtml = '<div class="flex" style="flex-wrap:wrap;">';
             for (let [item, qty] of Object.entries(profile.inventory)) {
                 if (qty > 0) {
-                    let displayItem = item.replace('_Gold', ' ✨');
-                    let price = item.includes('Gold') ? Math.floor(CROPS[item.replace('_Gold', '')].sellPrice * 1.5) : (CROPS[item]?.sellPrice || 5);
-                    invHtml += `<span class="inventory-item">${displayItem}: ${qty}</span>
-                                <button class="sellBtn" data-item="${item}" data-price="${price}" style="width:auto; padding:4px 12px;">بيع (${price})</button>`;
+                    let sellPrice = CROPS[item]?.sellPrice || (item === 'Egg' ? 3 : (item === 'Milk' ? 8 : (item === 'Wool' ? 6 : 5)));
+                    invHtml += `<span class="inventory-item">${item}: ${qty}</span>
+                                <button class="sellBtn" data-item="${item}" data-price="${sellPrice}" style="width:auto;">بيع (${sellPrice})</button>`;
                 }
             }
             invHtml += '</div>';
             if (Object.keys(profile.inventory).filter(k => profile.inventory[k] > 0).length === 0) invHtml = '<p>مخزن فارغ</p>';
             
-            // بناء السوق
+            // السوق
             let marketHtml = '';
             if (listings.length > 0) {
                 for (let l of listings) {
@@ -252,7 +296,6 @@
                 marketHtml = '<p>لا توجد إعلانات. كن أول من ينشر إعلاناً!</p>';
             }
             
-            // خيارات الإعلان
             let itemOptions = '';
             for (let item of Object.keys(profile.inventory)) {
                 if (profile.inventory[item] > 0) itemOptions += `<option value="${item}">${item}</option>`;
@@ -268,19 +311,33 @@
                     </div>
                     <div class="tabs">
                         <div class="tab-btn ${activeTab === 'farm' ? 'active' : ''}" data-tab="farm">🌾 المزرعة</div>
+                        <div class="tab-btn ${activeTab === 'animals' ? 'active' : ''}" data-tab="animals">🐔 الحيوانات</div>
                         <div class="tab-btn ${activeTab === 'inventory' ? 'active' : ''}" data-tab="inventory">📦 المخزون</div>
                         <div class="tab-btn ${activeTab === 'market' ? 'active' : ''}" data-tab="market">🛒 السوق</div>
                     </div>
-                    <div id="farmTab" class="tab-pane" style="${activeTab === 'farm' ? 'display:block' : 'display:none'}">
-                        ${fieldsHtml}
+                    
+                    <div id="farmTab" style="${activeTab === 'farm' ? 'display:block' : 'display:none'}">
+                        <div class="card">${fieldsHtml}</div>
                     </div>
-                    <div id="inventoryTab" class="tab-pane" style="${activeTab === 'inventory' ? 'display:block' : 'display:none'}">
+                    
+                    <div id="animalsTab" style="${activeTab === 'animals' ? 'display:block' : 'display:none'}">
                         <div class="card">
-                            <h3>📦 مخزني</h3>
+                            <h3>🐔 حيوانات المزرعة</h3>
+                            ${animalsHtml}
+                            <hr>
+                            <h3>🛒 شراء حيوانات جديدة</h3>
+                            ${buyAnimalsHtml}
+                        </div>
+                    </div>
+                    
+                    <div id="inventoryTab" style="${activeTab === 'inventory' ? 'display:block' : 'display:none'}">
+                        <div class="card">
+                            <h3>📦 المخزون</h3>
                             ${invHtml}
                         </div>
                     </div>
-                    <div id="marketTab" class="tab-pane" style="${activeTab === 'market' ? 'display:block' : 'display:none'}">
+                    
+                    <div id="marketTab" style="${activeTab === 'market' ? 'display:block' : 'display:none'}">
                         <div class="card">
                             <h3>🛒 السوق المشترك</h3>
                             ${marketHtml}
@@ -292,11 +349,11 @@
                             <button id="publishBtn">📢 نشر الإعلان</button>
                         </div>
                     </div>
+                    
                     <div id="globalMsg"></div>
                 </div>
             `;
             
-            // ربط الأحداث
             document.querySelectorAll('.sellBtn').forEach(btn => {
                 btn.onclick = () => sellDirect(btn.dataset.item);
             });
@@ -312,21 +369,16 @@
             };
             document.getElementById('logoutBtn').onclick = () => { supabase.auth.signOut(); location.reload(); };
             
-            // التبويبات
             document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.onclick = () => {
-                    activeTab = btn.dataset.tab;
-                    renderGame();
-                };
+                btn.onclick = () => { activeTab = btn.dataset.tab; renderGame(); };
             });
         }
         
-        // ---------- شاشات الدخول ----------
         async function renderLogin() {
             document.getElementById('app').innerHTML = `
                 <div class="screen">
                     <div class="card">
-                        <h2 style="text-align:center; margin-bottom:20px;">🌾 المزرعة الكبرى</h2>
+                        <h2 style="text-align:center;">🌾 المزرعة الكبرى</h2>
                         <input type="email" id="email" placeholder="البريد الإلكتروني">
                         <input type="password" id="password" placeholder="كلمة المرور (6+ أحرف)">
                         <button id="loginBtn">🔓 دخول</button>
@@ -365,6 +417,8 @@
         
         window.plantCrop = plantCrop;
         window.harvestField = harvestField;
+        window.buyAnimal = buyAnimal;
+        window.collectAnimal = collectAnimal;
         
         start();
     </script>
