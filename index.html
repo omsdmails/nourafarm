@@ -2,132 +2,371 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>اختبار المزرعة</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>المزرعة الكبرى | سوق مشترك</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { background: #1e3c2c; font-family: system-ui; display: flex; justify-content: center; padding: 20px; margin: 0; }
-        #app { max-width: 500px; width: 100%; background: #2e4a2e; border-radius: 30px; padding: 20px; color: white; }
-        button, input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 40px; border: none; }
-        button { background: #ffcf4a; font-weight: bold; cursor: pointer; }
-        .card { background: #1f3b1a; border-radius: 20px; padding: 20px; margin-bottom: 15px; }
-        .error { background: #8b3a3a; padding: 10px; border-radius: 20px; text-align: center; }
-        .success { background: #2a6b2a; padding: 10px; border-radius: 20px; text-align: center; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: linear-gradient(145deg, #1e3c2c 0%, #2a5a3a 100%); font-family: system-ui, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
+        #app { max-width: 650px; width: 100%; background: #2e4a2e; border-radius: 35px; overflow: hidden; color: #f5f5dc; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
+        .screen { padding: 20px; }
+        .card { background: #1f3b1a; border-radius: 25px; padding: 18px; margin-bottom: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 50px; border: none; font-size: 14px; }
+        button { background: #ffcf4a; color: #1f3b1a; font-weight: bold; cursor: pointer; transition: 0.1s; }
+        button:active { transform: scale(0.97); }
+        .flex { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .fields-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 15px 0; }
+        .field { background: #7c5e3a; border-radius: 20px; padding: 15px; text-align: center; cursor: pointer; transition: 0.1s; min-height: 110px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .field.ready { background: #e9b35f; color: #1f3b1a; box-shadow: 0 0 0 2px gold; }
+        .field.empty { background: #9b7652; }
+        .crop-select { background: #2c5e2a; border-radius: 15px; padding: 10px; margin-top: 10px; }
+        .crop-btn { background: #3f6b3a; margin: 4px; padding: 6px 10px; border-radius: 25px; font-size: 12px; border: none; color: white; cursor: pointer; }
+        .listing { background: #2c5e2a; border-radius: 20px; padding: 12px; margin: 10px 0; }
+        .error { background: #8b3a3a; padding: 10px; border-radius: 25px; text-align: center; }
+        .success { background: #2a6b2a; padding: 10px; border-radius: 25px; text-align: center; }
+        hr { border-color: #4f7840; margin: 12px 0; }
+        .quality-gold { color: #ffd966; font-size: 11px; }
+        .inventory-item { background: #3b5e2b; border-radius: 30px; padding: 5px 12px; display: inline-block; margin: 4px; }
+        .tab-btn { background: #3b5e2b; color: white; flex: 1; text-align: center; padding: 10px; border-radius: 40px; cursor: pointer; }
+        .tab-btn.active { background: #ffcf4a; color: #1f3b1a; }
+        .tabs { display: flex; gap: 8px; margin-bottom: 15px; }
+        h3 { margin-bottom: 10px; font-size: 18px; border-right: 4px solid #ffcf4a; padding-right: 10px; }
     </style>
 </head>
 <body>
-    <div id="app">⏳ جاري التحميل...</div>
+    <div id="app">⚙️ جاري تحميل المنصة...</div>
     <script>
-        // بيانات Supabase الخاصة بك
+        // ---------- إعداد Supabase ----------
         const SUPABASE_URL = 'https://kzheikbpxicoeohapfjb.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_aVm9aZ6W5vYTVvTxo3hucw__uZ06aId';
-        
-        // التحقق من تحميل المكتبة
-        if (typeof window.supabase === 'undefined') {
-            document.getElementById('app').innerHTML = '<div class="card"><div class="error">❌ مكتبة Supabase لم تحمل. تأكد من اتصال الإنترنت.</div></div>';
-        } else {
-            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ---------- بيانات المحاصيل ----------
+        const CROPS = {
+            Wheat: { nameAr: "قمح", emoji: "🌾", buyPrice: 2, sellPrice: 5, growTime: 5, quality: "normal" },
+            Tomato: { nameAr: "طماطم", emoji: "🍅", buyPrice: 3, sellPrice: 8, growTime: 7, quality: "normal" },
+            Carrot: { nameAr: "جزر", emoji: "🥕", buyPrice: 1, sellPrice: 4, growTime: 4, quality: "normal" },
+            Potato: { nameAr: "بطاطا", emoji: "🥔", buyPrice: 2, sellPrice: 6, growTime: 6, quality: "normal" },
+            Pepper: { nameAr: "فلفل", emoji: "🌶️", buyPrice: 4, sellPrice: 10, growTime: 9, quality: "normal" },
+            Cucumber: { nameAr: "خيار", emoji: "🥒", buyPrice: 3, sellPrice: 7, growTime: 6, quality: "normal" },
+            Onion: { nameAr: "بصل", emoji: "🧅", buyPrice: 2, sellPrice: 5, growTime: 5, quality: "normal" },
+            Strawberry: { nameAr: "فراولة", emoji: "🍓", buyPrice: 5, sellPrice: 12, growTime: 10, quality: "gold" },
+            Watermelon: { nameAr: "بطيخ", emoji: "🍉", buyPrice: 8, sellPrice: 20, growTime: 12, quality: "gold" },
+            Corn: { nameAr: "ذرة", emoji: "🌽", buyPrice: 3, sellPrice: 7, growTime: 8, quality: "normal" }
+        };
+
+        let currentUser = null;
+        let profile = null;
+        let activeTab = 'farm';
+
+        // ---------- دوال مساعدة ----------
+        function showMessage(msg, type) {
+            const msgDiv = document.getElementById('globalMsg');
+            if (msgDiv) {
+                msgDiv.innerHTML = `<div class="${type === 'error' ? 'error' : 'success'}">${msg}</div>`;
+                setTimeout(() => { if (msgDiv.innerHTML.includes(msg)) msgDiv.innerHTML = ''; }, 3000);
+            }
+        }
+
+        // ---------- إنشاء ملف اللاعب ----------
+        async function ensureProfile() {
+            const { data, error } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+            if (error && error.code !== 'PGRST116') throw error;
+            if (data) return data;
+            const newProfile = {
+                id: currentUser.id,
+                username: currentUser.email.split('@')[0],
+                gold: 150,
+                score: 0,
+                inventory: { Wheat: 5, Tomato: 3, Carrot: 2 },
+                game_data: { fields: [null, null, null, null] }  // 4 حقول
+            };
+            await supabase.from('profiles').insert(newProfile);
+            return newProfile;
+        }
+
+        // ---------- زراعة محصول في حقل معين ----------
+        async function plantCrop(cropKey, fieldIndex) {
+            if (profile.game_data.fields[fieldIndex]) {
+                showMessage('هذا الحقل مشغول! احصد أولاً', 'error');
+                return;
+            }
+            const crop = CROPS[cropKey];
+            if (profile.gold < crop.buyPrice) {
+                showMessage(`تحتاج ${crop.buyPrice} ذهب لزراعة ${crop.nameAr}`, 'error');
+                return;
+            }
+            profile.gold -= crop.buyPrice;
+            profile.game_data.fields[fieldIndex] = { crop: cropKey, plantedAt: Date.now() };
+            await supabase.from('profiles').update({ gold: profile.gold, game_data: profile.game_data }).eq('id', currentUser.id);
+            renderGame();
+            showMessage(`زرعت ${crop.emoji} ${crop.nameAr}! سينضج بعد ${crop.growTime} ثوانٍ`, 'success');
+        }
+
+        // ---------- حصاد محصول من حقل ----------
+        async function harvestField(fieldIndex) {
+            const field = profile.game_data.fields[fieldIndex];
+            if (!field) {
+                showMessage('لا يوجد محصول في هذا الحقل', 'error');
+                return;
+            }
+            const crop = CROPS[field.crop];
+            const elapsed = (Date.now() - field.plantedAt) / 1000;
+            if (elapsed < crop.growTime) {
+                const remaining = Math.ceil(crop.growTime - elapsed);
+                showMessage(`لم ينضج ${crop.nameAr} بعد! يتبقى ${remaining} ثوانٍ`, 'error');
+                return;
+            }
+            // حساب الجودة (إذا حصد مبكراً قبل 20% من الوقت الإضافي)
+            let quality = 'normal';
+            let sellPrice = crop.sellPrice;
+            if (crop.quality === 'gold' && elapsed >= crop.growTime * 1.5) {
+                quality = 'gold';
+                sellPrice = Math.floor(crop.sellPrice * 1.5);
+            }
+            profile.gold += sellPrice;
+            profile.score = (profile.score || 0) + 1;
+            const itemKey = quality === 'gold' ? `${field.crop}_Gold` : field.crop;
+            profile.inventory[itemKey] = (profile.inventory[itemKey] || 0) + 1;
+            profile.game_data.fields[fieldIndex] = null;
+            await supabase.from('profiles').update({ gold: profile.gold, score: profile.score, inventory: profile.inventory, game_data: profile.game_data }).eq('id', currentUser.id);
+            renderGame();
+            showMessage(`حصّدت ${crop.emoji} ${crop.nameAr} ${quality === 'gold' ? '✨ ذهبي ✨' : ''} +${sellPrice} ذهب!`, 'success');
+        }
+
+        // ---------- بيع مباشر من المخزون ----------
+        async function sellDirect(itemKey) {
+            let baseItem = itemKey.replace('_Gold', '');
+            let crop = CROPS[baseItem];
+            if (!crop) return;
+            let isGold = itemKey.includes('_Gold');
+            let price = isGold ? Math.floor(crop.sellPrice * 1.5) : crop.sellPrice;
+            if (!profile.inventory[itemKey] || profile.inventory[itemKey] <= 0) {
+                showMessage('لا تملك هذا المنتج', 'error');
+                return;
+            }
+            profile.inventory[itemKey]--;
+            profile.gold += price;
+            await supabase.from('profiles').update({ gold: profile.gold, inventory: profile.inventory }).eq('id', currentUser.id);
+            renderGame();
+            showMessage(`بعت ${itemKey} بـ ${price} ذهب`, 'success');
+        }
+
+        // ---------- السوق المشترك ----------
+        async function loadMarketListings() {
+            const { data, error } = await supabase.from('market_listings').select('*, seller:profiles(username)').eq('status', 'active').order('listed_at', { ascending: false });
+            if (error) return [];
+            return data || [];
+        }
+
+        async function createListing(item, qty, price) {
+            if (!profile.inventory[item] || profile.inventory[item] < qty) {
+                showMessage('لا تملك الكمية الكافية', 'error');
+                return;
+            }
+            profile.inventory[item] -= qty;
+            await supabase.from('profiles').update({ inventory: profile.inventory }).eq('id', currentUser.id);
+            await supabase.from('market_listings').insert({ seller_id: currentUser.id, item_name: item, quantity: qty, price_per_unit: price });
+            renderGame();
+            showMessage(`تم نشر ${qty} ${item} للبيع`, 'success');
+        }
+
+        async function buyListing(listingId, pricePerUnit, qty, itemName, total) {
+            if (profile.gold < total) {
+                showMessage('ذهب غير كاف', 'error');
+                return;
+            }
+            const { data: listing } = await supabase.from('market_listings').select('seller_id').eq('id', listingId).single();
+            if (!listing) return;
+            profile.gold -= total;
+            profile.inventory[itemName] = (profile.inventory[itemName] || 0) + qty;
+            await supabase.from('profiles').update({ gold: profile.gold, inventory: profile.inventory }).eq('id', currentUser.id);
+            const { data: seller } = await supabase.from('profiles').select('gold').eq('id', listing.seller_id).single();
+            if (seller) await supabase.from('profiles').update({ gold: seller.gold + total }).eq('id', listing.seller_id);
+            await supabase.from('market_listings').update({ status: 'sold' }).eq('id', listingId);
+            renderGame();
+            showMessage(`اشتريت ${qty} ${itemName}`, 'success');
+        }
+
+        // ---------- عرض الواجهة ----------
+        async function renderGame() {
+            const listings = await loadMarketListings();
             
-            // عرض شاشة تسجيل الدخول مباشرة (بدون انتظار getUser)
+            // بناء الحقول
+            let fieldsHtml = '<div class="fields-grid">';
+            for (let i = 0; i < 4; i++) {
+                const field = profile.game_data.fields[i];
+                if (field) {
+                    const crop = CROPS[field.crop];
+                    const elapsed = (Date.now() - field.plantedAt) / 1000;
+                    const isReady = elapsed >= crop.growTime;
+                    const percent = Math.min(100, (elapsed / crop.growTime) * 100);
+                    fieldsHtml += `
+                        <div class="field ${isReady ? 'ready' : ''}" onclick="window.harvestField(${i})">
+                            <div style="font-size:32px;">${crop.emoji}</div>
+                            <div>${crop.nameAr}</div>
+                            <div style="font-size:11px;">${isReady ? '✅ جاهز للحصاد' : `🌱 ينمو (${Math.ceil(crop.growTime - elapsed)} ثانية)`}</div>
+                            <div style="background:#4f7840; height:4px; width:100%; border-radius:4px; margin-top:5px;"><div style="background:#ffcf4a; width:${percent}%; height:4px; border-radius:4px;"></div></div>
+                        </div>
+                    `;
+                } else {
+                    // حقل فارغ - عرض أزرار المحاصيل
+                    let cropButtons = '';
+                    for (let [key, crop] of Object.entries(CROPS)) {
+                        cropButtons += `<button class="crop-btn" onclick="window.plantCrop('${key}', ${i})">${crop.emoji} ${crop.nameAr} (${crop.buyPrice})</button>`;
+                    }
+                    fieldsHtml += `<div class="field empty" style="cursor:default;"><div style="font-size:32px;">🌾</div><div>حقل فارغ</div><div class="crop-select">${cropButtons}</div></div>`;
+                }
+            }
+            fieldsHtml += '</div>';
+            
+            // بناء المخزون
+            let invHtml = '<div class="flex" style="flex-wrap:wrap;">';
+            for (let [item, qty] of Object.entries(profile.inventory)) {
+                if (qty > 0) {
+                    let displayItem = item.replace('_Gold', ' ✨');
+                    let price = item.includes('Gold') ? Math.floor(CROPS[item.replace('_Gold', '')].sellPrice * 1.5) : (CROPS[item]?.sellPrice || 5);
+                    invHtml += `<span class="inventory-item">${displayItem}: ${qty}</span>
+                                <button class="sellBtn" data-item="${item}" data-price="${price}" style="width:auto; padding:4px 12px;">بيع (${price})</button>`;
+                }
+            }
+            invHtml += '</div>';
+            if (Object.keys(profile.inventory).filter(k => profile.inventory[k] > 0).length === 0) invHtml = '<p>مخزن فارغ</p>';
+            
+            // بناء السوق
+            let marketHtml = '';
+            if (listings.length > 0) {
+                for (let l of listings) {
+                    marketHtml += `
+                        <div class="listing">
+                            <div class="flex">
+                                <span>${l.item_name} x${l.quantity}</span>
+                                <span>💰 ${l.price_per_unit}</span>
+                                <span>👤 ${l.seller?.username}</span>
+                                <button class="buyBtn" data-id="${l.id}" data-price="${l.price_per_unit}" data-qty="${l.quantity}" data-item="${l.item_name}" style="width:auto;">شراء</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            } else {
+                marketHtml = '<p>لا توجد إعلانات. كن أول من ينشر إعلاناً!</p>';
+            }
+            
+            // خيارات الإعلان
+            let itemOptions = '';
+            for (let item of Object.keys(profile.inventory)) {
+                if (profile.inventory[item] > 0) itemOptions += `<option value="${item}">${item}</option>`;
+            }
+            
             document.getElementById('app').innerHTML = `
-                <div class="card">
-                    <h2>🌾 المزرعة المشتركة</h2>
-                    <input type="email" id="email" placeholder="البريد الإلكتروني" value="test@example.com">
-                    <input type="password" id="password" placeholder="كلمة المرور" value="12345678">
-                    <button id="signupBtn">📝 إنشاء حساب جديد</button>
-                    <button id="loginBtn">🔓 تسجيل دخول</button>
-                    <div id="msg"></div>
+                <div class="screen">
+                    <div class="flex" style="background:#1f3b1a; padding:12px; border-radius:40px; margin-bottom:10px;">
+                        <span>💰 ${profile.gold} ذهب</span>
+                        <span>⭐ ${profile.score || 0}</span>
+                        <span>👤 ${profile.username}</span>
+                        <button id="logoutBtn" style="width:auto; background:#8b5a2b;">🚪 خروج</button>
+                    </div>
+                    <div class="tabs">
+                        <div class="tab-btn ${activeTab === 'farm' ? 'active' : ''}" data-tab="farm">🌾 المزرعة</div>
+                        <div class="tab-btn ${activeTab === 'inventory' ? 'active' : ''}" data-tab="inventory">📦 المخزون</div>
+                        <div class="tab-btn ${activeTab === 'market' ? 'active' : ''}" data-tab="market">🛒 السوق</div>
+                    </div>
+                    <div id="farmTab" class="tab-pane" style="${activeTab === 'farm' ? 'display:block' : 'display:none'}">
+                        ${fieldsHtml}
+                    </div>
+                    <div id="inventoryTab" class="tab-pane" style="${activeTab === 'inventory' ? 'display:block' : 'display:none'}">
+                        <div class="card">
+                            <h3>📦 مخزني</h3>
+                            ${invHtml}
+                        </div>
+                    </div>
+                    <div id="marketTab" class="tab-pane" style="${activeTab === 'market' ? 'display:block' : 'display:none'}">
+                        <div class="card">
+                            <h3>🛒 السوق المشترك</h3>
+                            ${marketHtml}
+                            <hr>
+                            <h4>➕ نشر إعلان جديد</h4>
+                            <select id="itemSelect">${itemOptions}</select>
+                            <input type="number" id="qtyInput" placeholder="الكمية" min="1">
+                            <input type="number" id="priceInput" placeholder="السعر لكل وحدة" min="1">
+                            <button id="publishBtn">📢 نشر الإعلان</button>
+                        </div>
+                    </div>
+                    <div id="globalMsg"></div>
                 </div>
             `;
             
-            document.getElementById('signupBtn').onclick = async () => {
-                const email = document.getElementById('email').value;
-                const pass = document.getElementById('password').value;
-                const resultDiv = document.getElementById('msg');
-                resultDiv.innerHTML = '<div class="success">⏳ جاري التسجيل...</div>';
-                const { error } = await supabase.auth.signUp({ email, password: pass });
-                if (error) {
-                    resultDiv.innerHTML = `<div class="error">❌ ${error.message}</div>`;
-                } else {
-                    resultDiv.innerHTML = '<div class="success">✅ تم التسجيل! تأكد من بريدك الإلكتروني (رابط التأكيد) ثم سجل الدخول.</div>';
-                }
+            // ربط الأحداث
+            document.querySelectorAll('.sellBtn').forEach(btn => {
+                btn.onclick = () => sellDirect(btn.dataset.item);
+            });
+            document.querySelectorAll('.buyBtn').forEach(btn => {
+                btn.onclick = () => buyListing(btn.dataset.id, parseInt(btn.dataset.price), parseInt(btn.dataset.qty), btn.dataset.item, parseInt(btn.dataset.price) * parseInt(btn.dataset.qty));
+            });
+            document.getElementById('publishBtn').onclick = () => {
+                const item = document.getElementById('itemSelect').value;
+                const qty = parseInt(document.getElementById('qtyInput').value);
+                const price = parseInt(document.getElementById('priceInput').value);
+                if (qty && price) createListing(item, qty, price);
+                else showMessage('املأ الكمية والسعر', 'error');
             };
+            document.getElementById('logoutBtn').onclick = () => { supabase.auth.signOut(); location.reload(); };
             
+            // التبويبات
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.onclick = () => {
+                    activeTab = btn.dataset.tab;
+                    renderGame();
+                };
+            });
+        }
+        
+        // ---------- شاشات الدخول ----------
+        async function renderLogin() {
+            document.getElementById('app').innerHTML = `
+                <div class="screen">
+                    <div class="card">
+                        <h2 style="text-align:center; margin-bottom:20px;">🌾 المزرعة الكبرى</h2>
+                        <input type="email" id="email" placeholder="البريد الإلكتروني">
+                        <input type="password" id="password" placeholder="كلمة المرور (6+ أحرف)">
+                        <button id="loginBtn">🔓 دخول</button>
+                        <button id="signupBtn">📝 حساب جديد</button>
+                        <div id="msg"></div>
+                    </div>
+                </div>
+            `;
             document.getElementById('loginBtn').onclick = async () => {
                 const email = document.getElementById('email').value;
                 const pass = document.getElementById('password').value;
-                const resultDiv = document.getElementById('msg');
-                resultDiv.innerHTML = '<div class="success">⏳ جاري الدخول...</div>';
                 const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
-                if (error) {
-                    resultDiv.innerHTML = `<div class="error">❌ ${error.message}</div>`;
-                } else {
-                    resultDiv.innerHTML = '<div class="success">✅ تم الدخول بنجاح! جاري تحميل اللعبة...</div>';
-                    // عرض شاشة بسيطة بعد الدخول
-                    setTimeout(() => {
-                        document.getElementById('app').innerHTML = `
-                            <div class="card">
-                                <div class="flex" style="display:flex; justify-content:space-between;">
-                                    <span>💰 100 ذهب</span>
-                                    <span>👤 ${email}</span>
-                                    <button id="logoutBtn" style="width:auto;">🚪 خروج</button>
-                                </div>
-                                <hr>
-                                <div>
-                                    <h3>🌾 مزرعتك</h3>
-                                    <button id="plantBtn" style="background:#7c5e3a;">زراعة قمح (2 ذهب)</button>
-                                    <button id="harvestBtn" style="background:#e9b35f;">حصاد (يظهر بعد 5 ثوانٍ)</button>
-                                </div>
-                                <hr>
-                                <div id="marketArea">
-                                    <h3>🛒 السوق المشترك</h3>
-                                    <p>جاري تحميل السوق...</p>
-                                </div>
-                                <div id="msg2"></div>
-                            </div>
-                        `;
-                        
-                        let gold = 100;
-                        let field = null;
-                        
-                        async function updateMarket() {
-                            const { data: listings } = await supabase.from('market_listings').select('*, seller:profiles(username)').eq('status', 'active');
-                            let marketHtml = '';
-                            if (listings && listings.length > 0) {
-                                for (let l of listings) {
-                                    marketHtml += `<div style="background:#2c5e2a; margin:8px 0; padding:10px; border-radius:15px;">${l.item_name} x${l.quantity} - 💰${l.price_per_unit} - 👤${l.seller?.username}</div>`;
-                                }
-                            } else {
-                                marketHtml = '<p>لا توجد إعلانات</p>';
-                            }
-                            document.getElementById('marketArea').innerHTML = `<h3>🛒 السوق المشترك</h3>${marketHtml}`;
-                        }
-                        updateMarket();
-                        
-                        document.getElementById('plantBtn').onclick = () => {
-                            if (field) { alert('الحقل مشغول!'); return; }
-                            if (gold < 2) { alert('لا تملك 2 ذهب'); return; }
-                            gold -= 2;
-                            field = { plantedAt: Date.now() };
-                            document.querySelector('.flex span:first-child').innerHTML = `💰 ${gold} ذهب`;
-                            alert('زرعت قمحاً! سينضج بعد 5 ثوانٍ');
-                            setTimeout(() => { alert('القمح نضج! اضغط حصاد'); }, 5000);
-                        };
-                        
-                        document.getElementById('harvestBtn').onclick = () => {
-                            if (!field) { alert('لا يوجد محصول في الحقل'); return; }
-                            if ((Date.now() - field.plantedAt) / 1000 < 5) { alert('لم ينضج بعد'); return; }
-                            gold += 5;
-                            field = null;
-                            document.querySelector('.flex span:first-child').innerHTML = `💰 ${gold} ذهب`;
-                            alert('حصّدت قمحاً! +5 ذهب');
-                        };
-                        
-                        document.getElementById('logoutBtn').onclick = () => { supabase.auth.signOut(); location.reload(); };
-                    }, 1000);
+                if (error) document.getElementById('msg').innerHTML = `<div class="error">${error.message}</div>`;
+                else start();
+            };
+            document.getElementById('signupBtn').onclick = async () => {
+                const email = document.getElementById('email').value;
+                const pass = document.getElementById('password').value;
+                if (pass.length < 6) {
+                    document.getElementById('msg').innerHTML = '<div class="error">كلمة المرور قصيرة جداً (6 أحرف على الأقل)</div>';
+                    return;
                 }
+                const { error } = await supabase.auth.signUp({ email, password: pass });
+                if (error) document.getElementById('msg').innerHTML = `<div class="error">${error.message}</div>`;
+                else document.getElementById('msg').innerHTML = '<div class="success">✅ تم التسجيل! تأكد من بريدك الإلكتروني (رابط التأكيد) ثم سجل الدخول.</div>';
             };
         }
+        
+        async function start() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) { renderLogin(); return; }
+            currentUser = user;
+            profile = await ensureProfile();
+            renderGame();
+        }
+        
+        window.plantCrop = plantCrop;
+        window.harvestField = harvestField;
+        
+        start();
     </script>
 </body>
 </html>
