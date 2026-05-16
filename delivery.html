@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>النقل والتوصيل | منصة الألعاب</title>
+    <title>النقل والتوصيل - منصة الألعاب</title>
     <style>
-        /* الأنماط السابقة مع إضافة بعض التحسينات */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: linear-gradient(145deg, #1e3c2c 0%, #2a5a3a 100%); font-family: system-ui, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
         .container { max-width: 900px; width: 100%; background: #2e4a2e; border-radius: 35px; overflow: hidden; color: #f5f5dc; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
@@ -19,7 +18,6 @@
         button { background: #ffcf4a; border: none; padding: 8px 16px; border-radius: 30px; cursor: pointer; font-weight: bold; }
         .message { background: #2a6b2a; padding: 10px; border-radius: 30px; text-align: center; margin-top: 15px; display: none; }
         .error-message { background: #8b3a3a; }
-        .logout-btn { background: #8b5a2b; color: white; }
         .progress-bar { background: #4f7840; height: 8px; border-radius: 4px; margin-top: 8px; overflow: hidden; }
         .progress-fill { background: #ffcf4a; width: 0%; height: 100%; transition: width 0.3s; }
     </style>
@@ -27,284 +25,29 @@
 <body>
     <div id="app">⏳ جاري التحميل...</div>
     <script>
-        // ========== الدوال العامة ==========
-        function getDistance(lat1, lon1, lat2, lon2) {
-            if (!lat1 || !lon1 || !lat2 || !lon2) return 9999; // مسافة كبيرة جداً إذا كان أحد الموقعين مفقوداً
-            const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return R * c;
-        }
-        
-        function getPlayerLocation(username) {
-            if (username === 'المتجر المركزي') return { lat: 31.9474, lon: 35.9332 };
-            const key = 'location_' + username;
-            const saved = localStorage.getItem(key);
-            if (saved) return JSON.parse(saved);
-            return null;
-        }
-        
-        // ========== تحميل البيانات ==========
-        let session = null;
-        let player = null;
-        let trucks = [];
-        
-        function loadSession() { /* كما هو سابق */ }
-        function loadGame() { /* كما هو سابق */ }
-        function saveGame() { /* كما هو سابق */ }
-        function showMessage(msg, isError) { /* كما هو سابق */ }
-        
-        function loadShipments() {
-            const all = localStorage.getItem('globalShipments');
-            return all ? JSON.parse(all) : [];
-        }
-        function saveShipments(shipments) {
-            localStorage.setItem('globalShipments', JSON.stringify(shipments));
-        }
-        
-        function loadTrucks() {
-            const key = session.isGuest ? 'guestTrucks' : 'trucks_' + session.username;
-            const saved = localStorage.getItem(key);
-            trucks = saved ? JSON.parse(saved) : [];
-            if (trucks.length === 0) {
-                trucks.push({ id: Date.now(), name: 'شاحنة صغيرة', status: 'available', missionEndTime: 0, assignedShipmentId: null, completedMissions: 0 });
-                saveTrucks();
-            }
-        }
-        function saveTrucks() {
-            const key = session.isGuest ? 'guestTrucks' : 'trucks_' + session.username;
-            localStorage.setItem(key, JSON.stringify(trucks));
-        }
-        
-        // ========== حساب المسافة والأولوية ==========
-        function getSortedShipments(shipments, truckLocation) {
-            return shipments.map(s => {
-                let distance = 9999;
-                if (s.from_location && s.from_location.lat && truckLocation) {
-                    distance = getDistance(truckLocation.lat, truckLocation.lon, s.from_location.lat, s.from_location.lon);
-                }
-                return { ...s, distance };
-            }).sort((a,b) => a.distance - b.distance);
-        }
-        
-        // ========== استلام طلب ==========
-        function acceptShipment(shipmentId, truckIndex) {
-            const truck = trucks[truckIndex];
-            if (truck.status !== 'available') { showMessage(`⚠️ الشاحنة مشغولة`, true); return; }
-            const shipments = loadShipments();
-            const shipment = shipments.find(s => s.id == shipmentId);
-            if (!shipment || shipment.status !== 'pending') { showMessage(`⚠️ الطلب غير متاح`, true); return; }
-            
-            // حساب وقت التوصيل بناءً على المسافة (كل 50 كم = 10 ثوانٍ تقريباً)
-            const driverLoc = getPlayerLocation(session.username);
-            const distance = getDistance(driverLoc.lat, driverLoc.lon, shipment.from_location.lat, shipment.from_location.lon);
-            const travelTimeSec = Math.max(10, Math.floor(distance / 5)); // 10 ثوانٍ كحد أدنى
-            
-            // تحديث حالة الشاحنة
-            truck.status = 'busy';
-            truck.missionEndTime = Date.now() + travelTimeSec * 1000;
-            truck.assignedShipmentId = shipmentId;
-            saveTrucks();
-            
-            // تحديث الطلب
-            shipment.status = 'in_transit';
-            shipment.assigned_to = session.username;
-            shipment.assigned_at = Date.now();
-            saveShipments(shipments);
-            
-            renderDelivery();
-            showMessage(`🚛 تم استلام الطلب. المسافة: ${distance.toFixed(1)} كم، وقت التوصيل المتوقع: ${travelTimeSec} ثانية.`, false);
-        }
-        trucks.push({ 
-    id: Date.now(), 
-    name: 'شاحنة صغيرة', 
-    status: 'available', 
-    missionEndTime: 0, 
-    assignedShipmentId: null, 
-    completedMissions: 0,
-    fuel: 100,        // نسبة الوقود 0-100
-    cleanliness: 80,  // نسبة النظافة 0-100
-    reliability: 90   // نسبة الموثوقية 0-100
-});
-        
-        // ========== إنهاء المهمات ==========
-        function checkCompletedMissions() {
-            let updated = false;
-            const shipments = loadShipments();
-            for (let i = 0; i < trucks.length; i++) {
-                const truck = trucks[i];
-                if (truck.status === 'busy' && Date.now() >= truck.missionEndTime) {
-                    const shipment = shipments.find(s => s.id === truck.assignedShipmentId);
-                    if (shipment && shipment.status === 'in_transit') {
-                        shipment.status = 'delivered';
-                        // إضافة البضاعة إلى المستلم
-                        const receiverKey = (shipment.to === 'المتجر المركزي' || shipment.to.includes('زائر')) ? 
-                            (shipment.to.includes('زائر') ? 'guestGame' : 'game_' + shipment.to) : 'game_' + shipment.to;
-                        let receiverData = localStorage.getItem(receiverKey);
-                        let receiver = receiverData ? JSON.parse(receiverData) : { inventory: {}, gold: 0 };
-                        receiver.inventory[shipment.item] = (receiver.inventory[shipment.item] || 0) + shipment.quantity;
-                        localStorage.setItem(receiverKey, JSON.stringify(receiver));
-                        
-                        // إضافة أجر النقل إلى السائق
-                        player.gold += shipment.reward;
-                        saveGame();
-                        
-                        // زيادة عدد المهام المنجزة للشاحنة (للاستخدام في الأولوية لاحقاً)
-                        truck.completedMissions = (truck.completedMissions || 0) + 1;
-                        saveTrucks();
-                        
-                        shipments.splice(shipments.indexOf(shipment), 1);
-                    }
-                    truck.status = 'available';
-                    truck.missionEndTime = 0;
-                    truck.assignedShipmentId = null;
-                    updated = true;
-                }
-            }
-            if (updated) {
-                saveShipments(shipments);
-                renderDelivery();
-                showMessage(`✅ تم توصيل طلب! حصلت على أجر النقل.`, false);
-            }
-        }
-        
-        function buyTruck() { /* كما هو سابق */ }
-        function logout() { /* كما هو سابق */ }
-        
-        // ========== عرض الواجهة ==========
-        function renderDelivery() {
-            checkCompletedMissions();
-            const shipments = loadShipments();
-            const pendingShipments = shipments.filter(s => s.status === 'pending');
-            const driverLocation = getPlayerLocation(session.username);
-            const sorted = getSortedShipments(pendingShipments, driverLocation);
-            
-            let shipmentsHtml = '';
-            if (sorted.length === 0) shipmentsHtml = '<p>🚚 لا توجد طلبات نقل حالياً</p>';
-            else {
-                for (let s of sorted) {
-                    shipmentsHtml += `
-                        <div class="shipment-card">
-                            <div>📦 ${s.item} x${s.quantity}</div>
-                            <div>🏁 من: ${s.from} → إلى: ${s.to}</div>
-                            <div>📏 المسافة: ${s.distance.toFixed(1)} كم</div>
-                            <div>💰 أجر النقل: ${s.reward} ذهب</div>
-                            <button onclick="window.acceptShipmentForTruck(${s.id})">📦 استلام هذا الطلب</button>
-                        </div>
-                    `;
-                }
-            }
-            
-            let trucksHtml = '';
-            for (let i = 0; i < trucks.length; i++) {
-                const t = trucks[i];
-                let statusText = t.status === 'available' ? '✅ جاهزة' : `🚛 في مهمة (${Math.ceil((t.missionEndTime - Date.now())/1000)} ثانية)`;
-                let progressPercent = 0;
-                if (t.status === 'busy' && t.missionEndTime > Date.now()) {
-                    const total = t.missionEndTime - (t.missionEndTime - Date.now()); // هذا لحساب النسبة يحتاج تعديل بسيط
-                    const elapsed = t.missionEndTime - Date.now();
-                    progressPercent = ((30*1000 - elapsed) / (30*1000)) * 100;
-                }
-                trucksHtml += `
-                    <div class="truck-card">
-                        <div>🚚 ${t.name}</div>
-                        <div>${statusText}</div>
-                        ${t.status === 'available' ? 
-                            `<button onclick="window.acceptAnyShipment(${i})">📦 استلام طلب (الأقرب)</button>` : 
-                            `<div class="progress-bar"><div class="progress-fill" style="width:${progressPercent}%;"></div></div>`
-                        }
-                    </div>
-                `;
-            }
-            
-            document.getElementById('app').innerHTML = `
-                <div class="container">
-                    <div class="header">
-                        <div class="gold">💰 ${player.gold} ذهب</div>
-                        <div>👤 ${session.username}</div>
-                        <div class="nav-buttons">
-                            <a href="dashboard.html" class="nav-btn">🏠 الرئيسية</a>
-                            <a href="market.html" class="nav-btn">🛒 السوق</a>
-                            <a href="store.html" class="nav-btn">🏪 المتجر</a>
-                            <a href="location.html" class="nav-btn">📍 موقعي</a>
-                            <button class="logout-btn" id="logoutBtn">🚪 خروج</button>
-                        </div>
-                    </div>
-                    <div class="content">
-                        <h2>🚚 النقل والتوصيل الجغرافي</h2>
-                        <div class="card">
-                            <h3>🚛 شاحناتي</h3>
-                            ${trucksHtml}
-                            <button onclick="window.buyTruck()" style="margin-top:10px;">➕ شراء شاحنة جديدة (100 ذهب)</button>
-                        </div>
-                        <div class="card">
-                            <h3>📦 الطلبات المتاحة (مرتبة حسب الأقرب إليك)</h3>
-                            ${shipmentsHtml}
-                        </div>
-                        <div id="message" class="message"></div>
-                    </div>
-                </div>
-            `;
-            document.getElementById('logoutBtn').onclick = logout;
-        }
-        
-        window.acceptShipmentForTruck = function(shipmentId) {
-            const availableTruckIndex = trucks.findIndex(t => t.status === 'available');
-            if (availableTruckIndex === -1) { showMessage('لا توجد شاحنات جاهزة', true); return; }
-            acceptShipment(shipmentId, availableTruckIndex);
-        };
-        window.acceptAnyShipment = function(truckIndex) {
-            const shipments = loadShipments();
-            const pending = shipments.filter(s => s.status === 'pending');
-            if (pending.length === 0) { showMessage('لا توجد طلبات', true); return; }
-            const driverLoc = getPlayerLocation(session.username);
-            const sorted = getSortedShipments(pending, driverLoc);
-            acceptShipment(sorted[0].id, truckIndex);
-        };
-        window.buyTruck = buyTruck;
-        
-        session = loadSession();
-        if (session) {
-            loadGame();
-            loadTrucks();
-            renderDelivery();
-            setInterval(() => renderDelivery(), 1000);
-        }
+        function formatMoney(fils){ return (fils/1000).toFixed(3)+' د.أ'; }
+        function getDistance(lat1,lon1,lat2,lon2){ if(!lat1||!lon1||!lat2||!lon2) return 9999; const R=6371; const dLat=(lat2-lat1)*Math.PI/180; const dLon=(lon2-lon1)*Math.PI/180; const a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2); const c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); return R*c; }
+        function getPlayerLocation(username){ if(username==='المتجر المركزي') return {lat:31.9474,lon:35.9332}; const saved=localStorage.getItem('location_'+username); if(saved) return JSON.parse(saved); return null; }
+        function loadSession(){ const saved=localStorage.getItem('farmSession'); if(!saved){window.location.href='index.html';return null;} try{const data=JSON.parse(saved); if(Date.now()-data.loginTime>86400000){localStorage.removeItem('farmSession');window.location.href='index.html';return null;} return data;}catch(e){window.location.href='index.html';return null;} }
+        let session=null, player=null, trucks=[];
+        function loadGame(){ const key=session.isGuest?'guestGame':'game_'+session.username; const saved=localStorage.getItem(key); if(saved){ player=JSON.parse(saved); if(!player.gold) player.gold=0; } else player={ gold:0, inventory:{}, score:0, fields:[], animals:[] }; }
+        function saveGame(){ const key=session.isGuest?'guestGame':'game_'+session.username; localStorage.setItem(key,JSON.stringify(player)); }
+        function showMessage(msg,isError){ const msgDiv=document.getElementById('message'); msgDiv.innerHTML=msg; msgDiv.className=isError?'message error-message':'message'; msgDiv.style.display='block'; setTimeout(()=>{msgDiv.style.display='none';},3000); }
+        function loadShipments(){ const all=localStorage.getItem('globalShipments'); return all?JSON.parse(all):[]; }
+        function saveShipments(shipments){ localStorage.setItem('globalShipments',JSON.stringify(shipments)); }
+        function loadTrucks(){ const key=session.isGuest?'guestTrucks':'trucks_'+session.username; const saved=localStorage.getItem(key); trucks=saved?JSON.parse(saved):[]; if(trucks.length===0) trucks.push({ id:Date.now(), name:'شاحنة صغيرة', status:'available', missionEndTime:0, assignedShipmentId:null, completedMissions:0, fuel:100, cleanliness:80, reliability:90 }); saveTrucks(); }
+        function saveTrucks(){ const key=session.isGuest?'guestTrucks':'trucks_'+session.username; localStorage.setItem(key,JSON.stringify(trucks)); }
+        function buyTruck(){ const price=100000; if(player.gold<price){ showMessage(`⚠️ تحتاج ${formatMoney(price)}`,true); return; } player.gold-=price; saveGame(); trucks.push({ id:Date.now(), name:`شاحنة ${trucks.length+1}`, status:'available', missionEndTime:0, assignedShipmentId:null, completedMissions:0, fuel:100, cleanliness:80, reliability:90 }); saveTrucks(); renderDelivery(); showMessage(`✅ اشتريت شاحنة جديدة`); }
+        function acceptShipment(shipmentId, truckIndex){ const truck=trucks[truckIndex]; if(truck.status!=='available'){ showMessage(`⚠️ الشاحنة مشغولة`,true); return; } const shipments=loadShipments(); const shipment=shipments.find(s=>s.id==shipmentId); if(!shipment||shipment.status!=='pending'){ showMessage(`⚠️ الطلب غير متاح`,true); return; } const driverLoc=getPlayerLocation(session.username); const distance=getDistance(driverLoc.lat,driverLoc.lon,shipment.from_location.lat,shipment.from_location.lon); const fuelNeeded=Math.ceil(distance/10); if(truck.fuel<fuelNeeded){ showMessage(`⚠️ الوقود غير كافٍ! تحتاج ${fuelNeeded}% وقود، لديك ${truck.fuel}%. توجه لمحطة وقود.`,true); return; } truck.fuel-=fuelNeeded; let travelTimeSec=Math.max(10, distance/10); if(truck.fuel<20) travelTimeSec*=1.5; truck.status='busy'; truck.missionEndTime=Date.now()+travelTimeSec*1000; truck.assignedShipmentId=shipmentId; saveTrucks(); shipment.status='in_transit'; shipment.assigned_to=session.username; shipment.assigned_at=Date.now(); saveShipments(shipments); renderDelivery(); showMessage(`🚛 تم استلام الطلب. المسافة: ${distance.toFixed(1)} كم، وقت التوصيل المتوقع: ${travelTimeSec} ثانية.`); }
+        function checkCompletedMissions(){ let updated=false; const shipments=loadShipments(); for(let i=0;i<trucks.length;i++){ const truck=trucks[i]; if(truck.status==='busy' && Date.now()>=truck.missionEndTime){ const shipment=shipments.find(s=>s.id===truck.assignedShipmentId); if(shipment && shipment.status==='in_transit'){ shipment.status='delivered'; const receiverKey=(shipment.to==='المتجر المركزي'||shipment.to.includes('زائر'))?(shipment.to.includes('زائر')?'guestGame':'game_'+shipment.to):'game_'+shipment.to; let receiverData=localStorage.getItem(receiverKey); let receiver=receiverData?JSON.parse(receiverData):{ inventory:{}, gold:0 }; receiver.inventory[shipment.item]=(receiver.inventory[shipment.item]||0)+shipment.quantity; localStorage.setItem(receiverKey,JSON.stringify(receiver)); player.gold+=shipment.reward; saveGame(); truck.completedMissions=(truck.completedMissions||0)+1; shipments.splice(shipments.indexOf(shipment),1); } truck.status='available'; truck.missionEndTime=0; truck.assignedShipmentId=null; updated=true; } } if(updated){ saveShipments(shipments); renderDelivery(); showMessage(`✅ تم توصيل طلب! حصلت على ${formatMoney(shipments.find(s=>s.assigned_to===session.username)?.reward||0)}`); } }
+        function renderDelivery(){ checkCompletedMissions(); const shipments=loadShipments(); const pendingShipments=shipments.filter(s=>s.status==='pending'); const driverLoc=getPlayerLocation(session.username); const sorted=pendingShipments.map(s=>{ let dist=9999; if(s.from_location&&driverLoc) dist=getDistance(driverLoc.lat,driverLoc.lon,s.from_location.lat,s.from_location.lon); return {...s, distance:dist}; }).sort((a,b)=>a.distance-b.distance); let shipmentsHtml=''; if(sorted.length===0) shipmentsHtml='<p>🚚 لا توجد طلبات نقل حالياً</p>'; else for(let s of sorted) shipmentsHtml+=`<div class="shipment-card"><div>📦 ${s.item} x${s.quantity}</div><div>🏁 من: ${s.from} → إلى: ${s.to}</div><div>📏 المسافة: ${s.distance.toFixed(1)} كم</div><div>💰 ${formatMoney(s.reward)}</div><button onclick="window.acceptShipmentForTruck(${s.id})">📦 استلام هذا الطلب</button></div>`;
+        let trucksHtml=''; for(let i=0;i<trucks.length;i++){ const t=trucks[i]; let statusText=t.status==='available'?'✅ جاهزة':`🚛 في مهمة (${Math.ceil((t.missionEndTime-Date.now())/1000)} ثانية)`; let progressPercent=0; if(t.status==='busy' && t.missionEndTime>Date.now()){ const total=t.missionEndTime-(t.missionEndTime-Date.now()); const elapsed=t.missionEndTime-Date.now(); progressPercent=((30000-elapsed)/30000)*100; } trucksHtml+=`<div class="truck-card"><div>🚚 ${t.name}</div><div>⛽ وقود: ${t.fuel}% | 🧼 نظافة: ${t.cleanliness}% | 🔧 موثوقية: ${t.reliability}%</div><div>${statusText}</div>${t.status==='available'?`<button onclick="window.acceptAnyShipment(${i})">📦 استلام طلب (الأقرب)</button>`:`<div class="progress-bar"><div class="progress-fill" style="width:${progressPercent}%;"></div></div>`}</div>`; }
+        document.getElementById('app').innerHTML=`<div class="container"><div class="header"><div class="gold">💰 ${formatMoney(player.gold)}</div><div>👤 ${session.username}</div><div class="nav-buttons"><a href="dashboard.html" class="nav-btn">🏠 الرئيسية</a><a href="map.html" class="nav-btn">🗺️ محطات الخدمة</a><button class="logout-btn" id="logoutBtn" style="background:#8b5a2b;">🚪 خروج</button></div></div><div class="content"><div class="card"><h3>🚛 شاحناتي</h3>${trucksHtml}<button onclick="window.buyTruck()" style="margin-top:10px;">➕ شراء شاحنة جديدة (${formatMoney(100000)})</button></div><div class="card"><h3>📦 الطلبات المتاحة (مرتبة حسب الأقرب إليك)</h3>${shipmentsHtml}</div><div id="message" class="message"></div></div></div>`;
+        document.getElementById('logoutBtn').onclick=()=>{ localStorage.removeItem('farmSession'); window.location.href='index.html'; }; }
+        window.acceptShipmentForTruck=function(shipmentId){ const idx=trucks.findIndex(t=>t.status==='available'); if(idx===-1){ showMessage('لا توجد شاحنات جاهزة',true); return; } acceptShipment(shipmentId,idx); };
+        window.acceptAnyShipment=function(truckIndex){ const shipments=loadShipments(); const pending=shipments.filter(s=>s.status==='pending'); if(pending.length===0){ showMessage('لا توجد طلبات',true); return; } const driverLoc=getPlayerLocation(session.username); const sorted=pending.map(s=>{ let dist=9999; if(s.from_location&&driverLoc) dist=getDistance(driverLoc.lat,driverLoc.lon,s.from_location.lat,s.from_location.lon); return {...s, distance:dist}; }).sort((a,b)=>a.distance-b.distance); acceptShipment(sorted[0].id,truckIndex); };
+        window.buyTruck=buyTruck;
+        session=loadSession(); if(session){ loadGame(); loadTrucks(); renderDelivery(); setInterval(()=>renderDelivery(),1000); }
     </script>
-    function acceptShipment(shipmentId, truckIndex) {
-    const truck = trucks[truckIndex];
-    if (truck.status !== 'available') { showMessage(`⚠️ الشاحنة مشغولة`, true); return; }
-    
-    // حساب المسافة والوقود اللازم
-    const driverLoc = getPlayerLocation(session.username);
-    const distance = getDistance(driverLoc.lat, driverLoc.lon, shipment.from_location.lat, shipment.from_location.lon);
-    const fuelNeeded = Math.ceil(distance / 10); // كل 10 كيلومتر تستهلك 1% وقود
-    if (truck.fuel < fuelNeeded) {
-        showMessage(`⚠️ الوقود غير كافٍ! تحتاج ${fuelNeeded}% وقود، لديك ${truck.fuel}%. توجه لمحطة وقود.`, true);
-        return;
-    }
-    
-    // استهلاك الوقود
-    truck.fuel -= fuelNeeded;
-    
-    // حساب وقت التوصيل الأساسي (كل 10 كم = ثانية واحدة)
-    let travelTimeSec = Math.max(10, distance / 10);
-    // تأثير الوقود: إذا كان الوقود منخفضاً، السرعة تقل
-    if (truck.fuel < 20) travelTimeSec *= 1.5;
-    // تأثير الموثوقية: فرصة عشوائية للتعطل (للتجربة سنضيفها لاحقاً)
-    
-    // تحديث حالة الشاحنة
-    truck.status = 'busy';
-    truck.missionEndTime = Date.now() + travelTimeSec * 1000;
-    truck.assignedShipmentId = shipmentId;
-    saveTrucks();
-    
-    // تحديث الطلب
-    // ... (باقي الكود كما هو)
-}
 </body>
 </html>
