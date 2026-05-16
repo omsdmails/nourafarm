@@ -6,97 +6,21 @@
     <title>لوحة الألعاب - منصة الألعاب</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: linear-gradient(135deg, #1e3c2c 0%, #2a5a3a 100%);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .dashboard {
-            max-width: 800px;
-            width: 100%;
-            background: #2e4a2e;
-            border-radius: 40px;
-            padding: 30px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-            text-align: center;
-            color: white;
-        }
+        body { background: linear-gradient(135deg, #1e3c2c 0%, #2a5a3a 100%); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        .dashboard { max-width: 800px; width: 100%; background: #2e4a2e; border-radius: 40px; padding: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); text-align: center; color: white; }
         h1 { color: #ffcf4a; margin-bottom: 10px; }
         .subtitle { color: #c5e0b4; margin-bottom: 20px; }
-        .ad-section {
-            background: #1f3b1a;
-            border-radius: 40px;
-            padding: 15px;
-            margin-bottom: 25px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .gold-display {
-            background: #ffcf4a;
-            color: #1f3b1a;
-            padding: 8px 16px;
-            border-radius: 40px;
-            font-weight: bold;
-        }
-        .ad-btn {
-            background: #ffcf4a;
-            border: none;
-            padding: 8px 20px;
-            border-radius: 40px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        .games-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            justify-content: center;
-            margin-bottom: 30px;
-        }
-        .game-card {
-            background: #1f3b1a;
-            border-radius: 30px;
-            padding: 25px;
-            width: 180px;
-            text-align: center;
-            cursor: pointer;
-            transition: 0.2s;
-            border: 2px solid #ffcf4a;
-        }
+        .ad-section { background: #1f3b1a; border-radius: 40px; padding: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .gold-display { background: #ffcf4a; color: #1f3b1a; padding: 8px 16px; border-radius: 40px; font-weight: bold; }
+        .ad-btn { background: #ffcf4a; border: none; padding: 8px 20px; border-radius: 40px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        .games-grid { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-bottom: 30px; }
+        .game-card { background: #1f3b1a; border-radius: 30px; padding: 25px; width: 180px; text-align: center; cursor: pointer; transition: 0.2s; border: 2px solid #ffcf4a; }
         .game-card:hover { transform: scale(1.02); background: #2c5e2a; }
         .game-card .emoji { font-size: 60px; display: block; margin-bottom: 10px; }
         .game-card h3 { font-size: 22px; margin-bottom: 5px; }
         .game-card p { font-size: 13px; color: #c5e0b4; }
-        .logout-btn {
-            background: #8b5a2b;
-            color: white;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 40px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-        .user-info {
-            background: #1f3b1a;
-            border-radius: 30px;
-            padding: 15px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
+        .logout-btn { background: #8b5a2b; color: white; padding: 12px 25px; border: none; border-radius: 40px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+        .user-info { background: #1f3b1a; border-radius: 30px; padding: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
     </style>
 </head>
 <body>
@@ -104,132 +28,53 @@
         <h1>🎮 منصة الألعاب</h1>
         <div class="subtitle">اختر لعبتك المفضلة</div>
         <div class="user-info" id="userInfo"></div>
-        
         <div class="ad-section">
-            <div class="gold-display" id="goldAmount">💰 0.000 دينار</div>
-            <button class="ad-btn" id="watchAdBtn">📺 مشاهدة إعلان (احصل على 0.050 دينار)</button>
+            <div class="gold-display" id="goldAmount">💰 0.000 د.أ</div>
+            <button class="ad-btn" id="watchAdBtn">📺 مشاهدة إعلان (احصل على 0.050 د.أ)</button>
             <div id="adMsg" style="font-size:12px; color:#aaffaa;"></div>
         </div>
-
         <div class="games-grid">
-            <div class="game-card" onclick="window.location.href='location.html'">
-                <div class="emoji">📍</div>
-                <h3>تحديد موقعي</h3>
-                <p>لتوزيع عادل للنقل</p>
-            </div>
-            <div class="game-card" onclick="window.location.href='farm.html'">
-                <div class="emoji">🌾</div>
-                <h3>المزرعة</h3>
-                <p>زراعة وحصاد وتربية حيوانات</p>
-            </div>
-            <div class="game-card" onclick="window.location.href='market.html'">
-                <div class="emoji">🛒</div>
-                <h3>السوق المشترك</h3>
-                <p>بيع وشراء مع لاعبين آخرين</p>
-            </div>
-            <div class="game-card" onclick="window.location.href='restaurant.html'">
-                <div class="emoji">🍽️</div>
-                <h3>المطعم</h3>
-                <p>طهي وجبات وبيعها بربح أعلى</p>
-            </div>
-            <div class="game-card" onclick="window.location.href='factory.html'">
-                <div class="emoji">🏭</div>
-                <h3>المصنع</h3>
-                <p>تحويل المواد الخام</p>
-            </div>
-            <div class="game-card" onclick="window.location.href='map.html'">
-                <div class="emoji">🗺️</div>
-                <h3>محطات الخدمة</h3>
-                <p>وقود، غسيل، صيانة</p>
-            </div>
-            <div class="game-card" onclick="window.location.href='delivery.html'">
-                <div class="emoji">🚚</div>
-                <h3>النقل والتوصيل</h3>
-                <p>نقل البضائع عبر الشاحنات</p>
-            </div>
-            <div class="game-card" onclick="window.location.href='store.html'">
-                <div class="emoji">🏪</div>
-                <h3>المتجر المركزي</h3>
-                <p>شراء بذور وحيوانات</p>
-            </div>
-            <div class="game-card" onclick="window.location.href='suggest.html'">
-                <div class="emoji">💡</div>
-                <h3>اقتراح لعبة</h3>
-                <p>أرسل فكرتك</p>
-            </div>
+            <div class="game-card" onclick="window.location.href='location.html'"><div class="emoji">📍</div><h3>تحديد موقعي</h3><p>لتوزيع عادل للنقل</p></div>
+            <div class="game-card" onclick="window.location.href='farm.html'"><div class="emoji">🌾</div><h3>المزرعة</h3><p>زراعة وحصاد وتربية حيوانات</p></div>
+            <div class="game-card" onclick="window.location.href='market.html'"><div class="emoji">🛒</div><h3>السوق المشترك</h3><p>بيع وشراء مع لاعبين آخرين</p></div>
+            <div class="game-card" onclick="window.location.href='restaurant.html'"><div class="emoji">🍽️</div><h3>المطعم</h3><p>طهي وجبات وبيعها بربح أعلى</p></div>
+            <div class="game-card" onclick="window.location.href='factory.html'"><div class="emoji">🏭</div><h3>المصنع</h3><p>تحويل المواد الخام</p></div>
+            <div class="game-card" onclick="window.location.href='map.html'"><div class="emoji">🗺️</div><h3>محطات الخدمة</h3><p>وقود، غسيل، صيانة</p></div>
+            <div class="game-card" onclick="window.location.href='delivery.html'"><div class="emoji">🚚</div><h3>النقل والتوصيل</h3><p>نقل البضائع عبر الشاحنات</p></div>
+            <div class="game-card" onclick="window.location.href='store.html'"><div class="emoji">🏪</div><h3>المتجر المركزي</h3><p>شراء بذور وحيوانات</p></div>
+            <div class="game-card" onclick="window.location.href='transfer.html'"><div class="emoji">💰</div><h3>تحويل الأموال</h3><p>إرسال دينار إلى لاعب آخر</p></div>
+            <div class="game-card" onclick="window.location.href='homelife.html'"><div class="emoji">🏡</div><h3>المنزل الآمن</h3><p>بناء منزل وتطوير مهارات</p></div>
+            <div class="game-card" onclick="window.location.href='suggest.html'"><div class="emoji">💡</div><h3>اقتراح لعبة</h3><p>أرسل فكرتك</p></div>
         </div>
-
         <button class="logout-btn" id="logoutBtn">🚪 تسجيل خروج</button>
     </div>
     <script>
-        // دالة تحويل الفلس إلى دينار (1 دينار = 1000 فلس)
-        function formatMoney(fils) {
-            let dinars = fils / 1000;
-            return dinars.toFixed(3) + ' دينار';
-        }
-        
-        function loadSession() {
-            const saved = localStorage.getItem('farmSession');
-            if (!saved) return null;
-            try {
-                const data = JSON.parse(saved);
-                if (Date.now() - data.loginTime > 86400000) {
-                    localStorage.removeItem('farmSession');
-                    return null;
-                }
-                return data;
-            } catch(e) { return null; }
-        }
-        
+        function formatMoney(fils) { return (fils / 1000).toFixed(3) + ' د.أ'; }
+        function loadSession() { const saved = localStorage.getItem('farmSession'); if(!saved) return null; try { const data = JSON.parse(saved); if(Date.now()-data.loginTime>86400000){localStorage.removeItem('farmSession');return null;} return data; } catch(e){return null;} }
         function updateGoldDisplay() {
-            const session = loadSession();
-            if (!session) return;
+            const session = loadSession(); if(!session) return;
             const key = session.isGuest ? 'guestGame' : 'game_' + session.username;
             const data = localStorage.getItem(key);
-            if (data) {
-                const player = JSON.parse(data);
-                const goldFils = player.gold || 0;
-                document.getElementById('goldAmount').innerHTML = `💰 ${formatMoney(goldFils)}`;
-            } else {
-                document.getElementById('goldAmount').innerHTML = '💰 0.000 دينار';
-            }
+            if(data) { const player = JSON.parse(data); document.getElementById('goldAmount').innerHTML = `💰 ${formatMoney(player.gold||0)}`; }
+            else document.getElementById('goldAmount').innerHTML = '💰 0.000 د.أ';
         }
-        
         function addGoldFromAd() {
-            const session = loadSession();
-            if (!session) {
-                document.getElementById('adMsg').innerHTML = '⚠️ يرجى تسجيل الدخول أولاً';
-                setTimeout(() => document.getElementById('adMsg').innerHTML = '', 2000);
-                return;
-            }
+            const session = loadSession(); if(!session) { document.getElementById('adMsg').innerHTML = '⚠️ يرجى تسجيل الدخول أولاً'; setTimeout(()=>document.getElementById('adMsg').innerHTML='',2000); return; }
             const key = session.isGuest ? 'guestGame' : 'game_' + session.username;
-            let player = localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key)) : { gold: 0, inventory: {} };
-            // إضافة 50 فلس = 0.050 دينار
-            player.gold = (player.gold || 0) + 50;
+            let player = localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key)) : { gold:0, inventory:{} };
+            player.gold = (player.gold||0) + 50;
             localStorage.setItem(key, JSON.stringify(player));
             updateGoldDisplay();
             document.getElementById('adMsg').innerHTML = '✅ تمت إضافة 0.050 دينار (50 فلس)';
-            setTimeout(() => document.getElementById('adMsg').innerHTML = '', 2500);
+            setTimeout(()=>document.getElementById('adMsg').innerHTML='',2500);
         }
-        
         const session = loadSession();
-        if (session) {
-            document.getElementById('userInfo').innerHTML = `
-                <span>👤 ${session.username}</span>
-                <span>🆔 ${session.isGuest ? 'زائر' : 'مسجل'}</span>
-                <button id="refreshBtn" style="background:#3b5e2b; padding:5px 12px; border-radius:30px;">🔄 تحديث</button>
-            `;
+        if(session) {
+            document.getElementById('userInfo').innerHTML = `<span>👤 ${session.username}</span><span>🆔 ${session.isGuest?'زائر':'مسجل'}</span><button id="refreshBtn" style="background:#3b5e2b; padding:5px 12px; border-radius:30px;">🔄 تحديث</button>`;
             document.getElementById('refreshBtn').onclick = () => location.reload();
             updateGoldDisplay();
-        } else {
-            document.getElementById('userInfo').innerHTML = '<span>⚠️ لم يتم تسجيل الدخول</span>';
-            setTimeout(() => { window.location.href = 'index.html'; }, 2000);
-        }
-        
-        document.getElementById('logoutBtn').onclick = () => {
-            localStorage.removeItem('farmSession');
-            window.location.href = 'index.html';
-        };
+        } else { document.getElementById('userInfo').innerHTML = '<span>⚠️ لم يتم تسجيل الدخول</span>'; setTimeout(()=>{window.location.href='index.html';},2000); }
+        document.getElementById('logoutBtn').onclick = () => { localStorage.removeItem('farmSession'); window.location.href='index.html'; };
         document.getElementById('watchAdBtn').onclick = addGoldFromAd;
     </script>
 </body>
