@@ -1,1 +1,0 @@
-{"username": "osama", "profession": "Farmer", "gold": 470, "inventory": {"Wheat": 8, "Carrot": 120}, "fields": [{"crop": "Carrot", "planted_time": 1778532947.6054049, "pos_index": 1}], "animals": [], "market_listings": [], "score": 151, "forest_trees": [{"stage": "mature", "planted_time": 1778531991.4997094}], "robot_owned": true, "robot_active": true, "total_harvested": 142}
