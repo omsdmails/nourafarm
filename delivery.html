@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>النقل والتوصيل | منصة الألعاب</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: linear-gradient(145deg, #1e3c2c 0%, #2a5a3a 100%); font-family: system-ui, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
+        .delivery-container { max-width: 650px; width: 100%; background: #2e4a2e; border-radius: 35px; overflow: hidden; color: #f5f5dc; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
+        .header { background: #1f3b1a; padding: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .gold { background: #ffcf4a; color: #1f3b1a; padding: 8px 16px; border-radius: 40px; font-weight: bold; }
+        .nav-buttons { display: flex; gap: 10px; }
+        .nav-btn { background: #3b5e2b; color: white; padding: 8px 16px; border-radius: 30px; text-decoration: none; font-weight: bold; }
+        .content { padding: 20px; }
+        .mission-card { background: #1f3b1a; border-radius: 20px; padding: 15px; margin: 10px 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .mission-card button { background: #ffcf4a; border: none; padding: 6px 20px; border-radius: 25px; cursor: pointer; font-weight: bold; }
+        .message { background: #2a6b2a; padding: 10px; border-radius: 30px; text-align: center; margin-top: 15px; display: none; }
+        .logout-btn { background: #8b5a2b; color: white; }
+        hr { border-color: #4f7840; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <div id="app">⏳ جاري التحميل...</div>
+    <script>
+        // قائمة مهام التوصيل
+        const MISSIONS = [
+            { id: 1, from: "المزرعة", to: "المخبز", item: "قمح", quantity: 5, reward: 25, description: "توصيل 5 قمح إلى المخبز" },
+            { id: 2, from: "المزرعة", to: "السوق", item: "طماطم", quantity: 3, reward: 20, description: "توصيل 3 طماطم إلى السوق" },
+            { id: 3, from: "الحظيرة", to: "المصنع", item: "حليب", quantity: 2, reward: 30, description: "توصيل 2 حليب إلى المصنع" },
+            { id: 4, from: "المزرعة", to: "المطعم", item: "بيض", quantity: 4, reward: 28, description: "توصيل 4 بيض إلى المطعم" },
+            { id: 5, from: "المزرعة", to: "محطة القطار", item: "بطاطا", quantity: 6, reward: 35, description: "توصيل 6 بطاطا إلى محطة القطار" }
+        ];
+        
+        let session = null;
+        let player = null;
+        let completedMissions = [];
+        
+        function loadSession() {
+            const saved = localStorage.getItem('farmSession');
+            if (!saved) { window.location.href = 'index.html'; return null; }
+            try {
+                const data = JSON.parse(saved);
+                if (Date.now() - data.loginTime > 86400000) { localStorage.removeItem('farmSession'); window.location.href = 'index.html'; return null; }
+                return data;
+            } catch(e) { window.location.href = 'index.html'; return null; }
+        }
+        
+        function loadGame() {
+            if (session.isGuest) {
+                const guestGame = localStorage.getItem('guestGame');
+                player = guestGame ? JSON.parse(guestGame) : { gold: 100, inventory: {} };
+                const guestMissions = localStorage.getItem('guestMissions');
+                completedMissions = guestMissions ? JSON.parse(guestMissions) : [];
+            } else {
+                const saved = localStorage.getItem('game_' + session.username);
+                player = saved ? JSON.parse(saved) : { gold: 100, inventory: {} };
+                const missionsSaved = localStorage.getItem('missions_' + session.username);
+                completedMissions = missionsSaved ? JSON.parse(missionsSaved) : [];
+            }
+            if (!player.inventory) player.inventory = {};
+            if (!player.gold) player.gold = 100;
+        }
+        
+        function saveGame() {
+            if (session.isGuest) {
+                localStorage.setItem('guestGame', JSON.stringify(player));
+                localStorage.setItem('guestMissions', JSON.stringify(completedMissions));
+            } else {
+                localStorage.setItem('game_' + session.username, JSON.stringify(player));
+                localStorage.setItem('missions_' + session.username, JSON.stringify(completedMissions));
+            }
+        }
+        
+        function showMessage(msg, isError = false) {
+            const msgDiv = document.getElementById('message');
+            msgDiv.innerHTML = msg;
+            msgDiv.className = isError ? 'message error-message' : 'message';
+            msgDiv.style.display = 'block';
+            setTimeout(() => { msgDiv.style.display = 'none'; }, 3000);
+        }
+        
+        function completeMission(mission) {
+            if (completedMissions.includes(mission.id)) {
+                showMessage(`⚠️ هذه المهمة مكتملة مسبقاً`, true);
+                return;
+            }
+            const requiredQty = mission.quantity;
+            const available = player.inventory[mission.item] || 0;
+            if (available < requiredQty) {
+                showMessage(`⚠️ تحتاج ${requiredQty} من ${mission.item}`, true);
+                return;
+            }
+            // خصم المنتجات من المخزون
+            player.inventory[mission.item] -= requiredQty;
+            if (player.inventory[mission.item] === 0) delete player.inventory[mission.item];
+            // إضافة المكافأة
+            player.gold += mission.reward;
+            completedMissions.push(mission.id);
+            saveGame();
+            renderDelivery();
+            showMessage(`🚛 تم توصيل ${mission.item} إلى ${mission.to}! +${mission.reward} ذهب`);
+        }
+        
+        function logout() {
+            localStorage.removeItem('farmSession');
+            window.location.href = 'index.html';
+        }
+        
+        function renderDelivery() {
+            let missionsHtml = '';
+            for (let m of MISSIONS) {
+                const isCompleted = completedMissions.includes(m.id);
+                missionsHtml += `
+                    <div class="mission-card">
+                        <div>
+                            <strong>🚚 ${m.description}</strong><br>
+                            <span style="font-size:13px;">📦 المطلوب: ${m.quantity} × ${m.item} | 🏆 المكافأة: ${m.reward} ذهب</span>
+                            ${isCompleted ? '<br><span style="color:#aaf0a0;">✅ مكتملة</span>' : ''}
+                        </div>
+                        ${!isCompleted ? `<button onclick="window.completeMission(${JSON.stringify(m).replace(/"/g, '&quot;')})">توصيل</button>` : ''}
+                    </div>
+                `;
+            }
+            
+            // إظهار مخزون اللاعب
+            let inventoryHtml = '<div style="background:#1f3b1a; border-radius:20px; padding:12px; margin-top:15px;">';
+            inventoryHtml += '<h3>📦 مخزونك الحالي</h3>';
+            if (Object.keys(player.inventory).length === 0) inventoryHtml += '<p>مخزنك فارغ</p>';
+            else {
+                for (let [item, qty] of Object.entries(player.inventory)) {
+                    inventoryHtml += `<span style="background:#3b5e2b; border-radius:30px; padding:5px 12px; display:inline-block; margin:4px;">${item}: ${qty}</span>`;
+                }
+            }
+            inventoryHtml += '</div>';
+            
+            document.getElementById('app').innerHTML = `
+                <div class="delivery-container">
+                    <div class="header">
+                        <div class="gold">💰 ${player.gold} ذهب</div>
+                        <div>👤 ${session.username}</div>
+                        <div class="nav-buttons">
+                            <a href="dashboard.html" class="nav-btn">🏠 الرئيسية</a>
+                            <button class="logout-btn" id="logoutBtn">🚪 خروج</button>
+                        </div>
+                    </div>
+                    <div class="content">
+                        <h2>🚚 النقل والتوصيل</h2>
+                        <p>قم بتوصيل المنتجات إلى وجهاتها وكسب الذهب</p>
+                        ${missionsHtml}
+                        ${inventoryHtml}
+                        <div id="message" class="message"></div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('logoutBtn').onclick = logout;
+        }
+        
+        session = loadSession();
+        if (session) {
+            loadGame();
+            renderDelivery();
+        }
+        window.completeMission = completeMission;
+    </script>
+</body>
+</html>
