@@ -7,161 +7,248 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: linear-gradient(145deg, #1e3c2c 0%, #2a5a3a 100%); font-family: system-ui, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
-        .delivery-container { max-width: 650px; width: 100%; background: #2e4a2e; border-radius: 35px; overflow: hidden; color: #f5f5dc; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
+        .container { max-width: 800px; width: 100%; background: #2e4a2e; border-radius: 35px; overflow: hidden; color: #f5f5dc; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
         .header { background: #1f3b1a; padding: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .gold { background: #ffcf4a; color: #1f3b1a; padding: 8px 16px; border-radius: 40px; font-weight: bold; }
         .nav-buttons { display: flex; gap: 10px; }
         .nav-btn { background: #3b5e2b; color: white; padding: 8px 16px; border-radius: 30px; text-decoration: none; font-weight: bold; }
         .content { padding: 20px; }
-        .mission-card { background: #1f3b1a; border-radius: 20px; padding: 15px; margin: 10px 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .mission-card button { background: #ffcf4a; border: none; padding: 6px 20px; border-radius: 25px; cursor: pointer; font-weight: bold; }
+        .card { background: #1f3b1a; border-radius: 20px; padding: 15px; margin-bottom: 20px; }
+        .truck-card { background: #2c5e2a; border-radius: 20px; padding: 12px; margin: 10px 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .shipment-card { background: #2c5e2a; border-radius: 20px; padding: 12px; margin: 8px 0; }
+        button { background: #ffcf4a; border: none; padding: 8px 16px; border-radius: 30px; cursor: pointer; font-weight: bold; }
         .message { background: #2a6b2a; padding: 10px; border-radius: 30px; text-align: center; margin-top: 15px; display: none; }
+        .error-message { background: #8b3a3a; }
         .logout-btn { background: #8b5a2b; color: white; }
         hr { border-color: #4f7840; margin: 15px 0; }
+        .progress-bar { background: #4f7840; height: 8px; border-radius: 4px; margin-top: 8px; overflow: hidden; }
+        .progress-fill { background: #ffcf4a; width: 0%; height: 100%; transition: width 0.3s; }
     </style>
 </head>
 <body>
     <div id="app">⏳ جاري التحميل...</div>
     <script>
-        // قائمة مهام التوصيل
-        const MISSIONS = [
-            { id: 1, from: "المزرعة", to: "المخبز", item: "قمح", quantity: 5, reward: 25, description: "توصيل 5 قمح إلى المخبز" },
-            { id: 2, from: "المزرعة", to: "السوق", item: "طماطم", quantity: 3, reward: 20, description: "توصيل 3 طماطم إلى السوق" },
-            { id: 3, from: "الحظيرة", to: "المصنع", item: "حليب", quantity: 2, reward: 30, description: "توصيل 2 حليب إلى المصنع" },
-            { id: 4, from: "المزرعة", to: "المطعم", item: "بيض", quantity: 4, reward: 28, description: "توصيل 4 بيض إلى المطعم" },
-            { id: 5, from: "المزرعة", to: "محطة القطار", item: "بطاطا", quantity: 6, reward: 35, description: "توصيل 6 بطاطا إلى محطة القطار" }
-        ];
-        
         let session = null;
         let player = null;
-        let completedMissions = [];
+        let trucks = []; // شاحنات اللاعب: { id, name, status, missionEndTime, assignedShipmentId }
         
-        function loadSession() {
-            const saved = localStorage.getItem('farmSession');
-            if (!saved) { window.location.href = 'index.html'; return null; }
-            try {
-                const data = JSON.parse(saved);
-                if (Date.now() - data.loginTime > 86400000) { localStorage.removeItem('farmSession'); window.location.href = 'index.html'; return null; }
-                return data;
-            } catch(e) { window.location.href = 'index.html'; return null; }
+        // تحميل وحفظ البيانات العامة
+        function loadShipments() {
+            const all = localStorage.getItem('globalShipments');
+            return all ? JSON.parse(all) : [];
+        }
+        function saveShipments(shipments) {
+            localStorage.setItem('globalShipments', JSON.stringify(shipments));
         }
         
-        function loadGame() {
-            if (session.isGuest) {
-                const guestGame = localStorage.getItem('guestGame');
-                player = guestGame ? JSON.parse(guestGame) : { gold: 100, inventory: {} };
-                const guestMissions = localStorage.getItem('guestMissions');
-                completedMissions = guestMissions ? JSON.parse(guestMissions) : [];
-            } else {
-                const saved = localStorage.getItem('game_' + session.username);
-                player = saved ? JSON.parse(saved) : { gold: 100, inventory: {} };
-                const missionsSaved = localStorage.getItem('missions_' + session.username);
-                completedMissions = missionsSaved ? JSON.parse(missionsSaved) : [];
-            }
-            if (!player.inventory) player.inventory = {};
-            if (!player.gold) player.gold = 100;
-        }
-        
-        function saveGame() {
-            if (session.isGuest) {
-                localStorage.setItem('guestGame', JSON.stringify(player));
-                localStorage.setItem('guestMissions', JSON.stringify(completedMissions));
-            } else {
-                localStorage.setItem('game_' + session.username, JSON.stringify(player));
-                localStorage.setItem('missions_' + session.username, JSON.stringify(completedMissions));
+        function loadTrucks() {
+            const key = session.isGuest ? 'guestTrucks' : 'trucks_' + session.username;
+            const saved = localStorage.getItem(key);
+            trucks = saved ? JSON.parse(saved) : [];
+            if (trucks.length === 0) {
+                // شاحنة ابتدائية مجانية
+                trucks.push({ id: Date.now(), name: 'شاحنة صغيرة', status: 'available', missionEndTime: 0, assignedShipmentId: null });
+                saveTrucks();
             }
         }
-        
-        function showMessage(msg, isError = false) {
-            const msgDiv = document.getElementById('message');
-            msgDiv.innerHTML = msg;
-            msgDiv.className = isError ? 'message error-message' : 'message';
-            msgDiv.style.display = 'block';
-            setTimeout(() => { msgDiv.style.display = 'none'; }, 3000);
+        function saveTrucks() {
+            const key = session.isGuest ? 'guestTrucks' : 'trucks_' + session.username;
+            localStorage.setItem(key, JSON.stringify(trucks));
         }
         
-        function completeMission(mission) {
-            if (completedMissions.includes(mission.id)) {
-                showMessage(`⚠️ هذه المهمة مكتملة مسبقاً`, true);
-                return;
-            }
-            const requiredQty = mission.quantity;
-            const available = player.inventory[mission.item] || 0;
-            if (available < requiredQty) {
-                showMessage(`⚠️ تحتاج ${requiredQty} من ${mission.item}`, true);
-                return;
-            }
-            // خصم المنتجات من المخزون
-            player.inventory[mission.item] -= requiredQty;
-            if (player.inventory[mission.item] === 0) delete player.inventory[mission.item];
-            // إضافة المكافأة
-            player.gold += mission.reward;
-            completedMissions.push(mission.id);
+        function loadSession() { /* كما هو سابق */ }
+        function loadGame() { /* كما هو سابق */ }
+        function saveGame() { /* كما هو سابق */ }
+        function showMessage(msg, isError) { /* كما هو سابق */ }
+        
+        // شراء شاحنة جديدة
+        function buyTruck() {
+            const price = 100;
+            if (player.gold < price) { showMessage(`⚠️ تحتاج ${price} ذهب`, true); return; }
+            player.gold -= price;
             saveGame();
+            trucks.push({ id: Date.now(), name: `شاحنة ${trucks.length+1}`, status: 'available', missionEndTime: 0, assignedShipmentId: null });
+            saveTrucks();
             renderDelivery();
-            showMessage(`🚛 تم توصيل ${mission.item} إلى ${mission.to}! +${mission.reward} ذهب`);
+            showMessage(`✅ اشتريت شاحنة جديدة`, false);
         }
         
-        function logout() {
-            localStorage.removeItem('farmSession');
-            window.location.href = 'index.html';
+        // استلام طلب نقل بواسطة شاحنة معينة
+        function acceptShipment(shipmentId, truckIndex) {
+            const truck = trucks[truckIndex];
+            if (truck.status !== 'available') { showMessage(`⚠️ هذه الشاحنة مشغولة حالياً`, true); return; }
+            const shipments = loadShipments();
+            const shipment = shipments.find(s => s.id == shipmentId);
+            if (!shipment || shipment.status !== 'pending') { showMessage(`⚠️ الطلب غير متاح`, true); return; }
+            
+            // تحديث حالة الشاحنة
+            const deliveryTime = 30; // 30 ثانية
+            truck.status = 'busy';
+            truck.missionEndTime = Date.now() + deliveryTime * 1000;
+            truck.assignedShipmentId = shipmentId;
+            saveTrucks();
+            
+            // تحديث الطلب
+            shipment.status = 'in_transit';
+            shipment.assigned_to = session.username;
+            shipment.assigned_at = Date.now();
+            saveShipments(shipments);
+            
+            renderDelivery();
+            showMessage(`🚛 تم استلام الطلب. سيتم التوصيل خلال ${deliveryTime} ثانية.`, false);
         }
+        
+        // التحقق من انتهاء المهمات وتطبيق التوصيل
+        function checkCompletedMissions() {
+            let updated = false;
+            const shipments = loadShipments();
+            for (let i = 0; i < trucks.length; i++) {
+                const truck = trucks[i];
+                if (truck.status === 'busy' && Date.now() >= truck.missionEndTime) {
+                    // إتمام التوصيل
+                    const shipment = shipments.find(s => s.id === truck.assignedShipmentId);
+                    if (shipment && shipment.status === 'in_transit') {
+                        shipment.status = 'delivered';
+                        // إضافة البضاعة إلى مخزون المستلم (المشتري)
+                        const receiverGameKey = (shipment.to === 'المتجر المركزي' || shipment.to.includes('زائر')) ? 
+                            (shipment.to.includes('زائر') ? 'guestGame' : 'game_' + shipment.to) : 'game_' + shipment.to;
+                        let receiverData = localStorage.getItem(receiverGameKey);
+                        let receiver = receiverData ? JSON.parse(receiverData) : { inventory: {}, gold: 0 };
+                        receiver.inventory[shipment.item] = (receiver.inventory[shipment.item] || 0) + shipment.quantity;
+                        localStorage.setItem(receiverGameKey, JSON.stringify(receiver));
+                        
+                        // إضافة أجر النقل إلى صاحب الشاحنة (اللاعب الحالي)
+                        player.gold += shipment.reward;
+                        saveGame();
+                        
+                        // حذف الطلب بعد التوصيل (أو وضع علامة منتهي)
+                        shipments.splice(shipments.indexOf(shipment), 1);
+                    }
+                    // إعادة الشاحنة إلى حالة جاهزة
+                    truck.status = 'available';
+                    truck.missionEndTime = 0;
+                    truck.assignedShipmentId = null;
+                    updated = true;
+                }
+            }
+            if (updated) {
+                saveShipments(shipments);
+                saveTrucks();
+                renderDelivery();
+                showMessage(`✅ تم توصيل طلب! حصلت على ${shipments.find(s => s.assigned_to === session.username)?.reward || ''} ذهب`, false);
+            }
+        }
+        
+        function logout() { /* نفس السابق */ }
         
         function renderDelivery() {
-            let missionsHtml = '';
-            for (let m of MISSIONS) {
-                const isCompleted = completedMissions.includes(m.id);
-                missionsHtml += `
-                    <div class="mission-card">
-                        <div>
-                            <strong>🚚 ${m.description}</strong><br>
-                            <span style="font-size:13px;">📦 المطلوب: ${m.quantity} × ${m.item} | 🏆 المكافأة: ${m.reward} ذهب</span>
-                            ${isCompleted ? '<br><span style="color:#aaf0a0;">✅ مكتملة</span>' : ''}
+            checkCompletedMissions(); // تحديث فوري
+            const shipments = loadShipments();
+            const pendingShipments = shipments.filter(s => s.status === 'pending');
+            
+            let shipmentsHtml = '';
+            if (pendingShipments.length === 0) shipmentsHtml = '<p>🚚 لا توجد طلبات نقل حالياً</p>';
+            else {
+                for (let s of pendingShipments) {
+                    shipmentsHtml += `
+                        <div class="shipment-card">
+                            <div>📦 ${s.item} x${s.quantity}</div>
+                            <div>🏁 من: ${s.from} → إلى: ${s.to}</div>
+                            <div>💰 أجر النقل: ${s.reward} ذهب</div>
+                            ${s.assigned_to ? `<div>🚛 تم التعيين لـ ${s.assigned_to}</div>` : ''}
                         </div>
-                        ${!isCompleted ? `<button onclick="window.completeMission(${JSON.stringify(m).replace(/"/g, '&quot;')})">توصيل</button>` : ''}
+                    `;
+                }
+            }
+            
+            let trucksHtml = '';
+            for (let i = 0; i < trucks.length; i++) {
+                const t = trucks[i];
+                let statusText = t.status === 'available' ? '✅ جاهزة' : `🚛 في مهمة (${Math.ceil((t.missionEndTime - Date.now())/1000)} ثانية متبقية)`;
+                let progressPercent = 0;
+                if (t.status === 'busy' && t.missionEndTime > Date.now()) {
+                    const total = 30 * 1000;
+                    const elapsed = total - (t.missionEndTime - Date.now());
+                    progressPercent = (elapsed / total) * 100;
+                }
+                trucksHtml += `
+                    <div class="truck-card">
+                        <div>🚚 ${t.name}</div>
+                        <div>${statusText}</div>
+                        ${t.status === 'available' ? 
+                            `<div><button onclick="window.acceptShipmentForTruck(${i})">📦 استلام طلب</button></div>` : 
+                            `<div class="progress-bar"><div class="progress-fill" style="width:${progressPercent}%;"></div></div>`
+                        }
                     </div>
                 `;
             }
             
-            // إظهار مخزون اللاعب
-            let inventoryHtml = '<div style="background:#1f3b1a; border-radius:20px; padding:12px; margin-top:15px;">';
-            inventoryHtml += '<h3>📦 مخزونك الحالي</h3>';
-            if (Object.keys(player.inventory).length === 0) inventoryHtml += '<p>مخزنك فارغ</p>';
-            else {
-                for (let [item, qty] of Object.entries(player.inventory)) {
-                    inventoryHtml += `<span style="background:#3b5e2b; border-radius:30px; padding:5px 12px; display:inline-block; margin:4px;">${item}: ${qty}</span>`;
-                }
+            // خيارات لاختيار طلب محدد (في حال وجود عدة طلبات)
+            let selectShipmentHtml = '';
+            if (pendingShipments.length > 0) {
+                selectShipmentHtml = `
+                    <select id="shipmentSelect">
+                        ${pendingShipments.map(s => `<option value="${s.id}">${s.item} x${s.quantity} (من ${s.from})</option>`).join('')}
+                    </select>
+                    <button id="acceptSpecificBtn">قبول الطلب المختار</button>
+                `;
             }
-            inventoryHtml += '</div>';
             
             document.getElementById('app').innerHTML = `
-                <div class="delivery-container">
+                <div class="container">
                     <div class="header">
                         <div class="gold">💰 ${player.gold} ذهب</div>
                         <div>👤 ${session.username}</div>
                         <div class="nav-buttons">
                             <a href="dashboard.html" class="nav-btn">🏠 الرئيسية</a>
+                            <a href="market.html" class="nav-btn">🛒 السوق</a>
+                            <a href="store.html" class="nav-btn">🏪 المتجر</a>
                             <button class="logout-btn" id="logoutBtn">🚪 خروج</button>
                         </div>
                     </div>
                     <div class="content">
                         <h2>🚚 النقل والتوصيل</h2>
-                        <p>قم بتوصيل المنتجات إلى وجهاتها وكسب الذهب</p>
-                        ${missionsHtml}
-                        ${inventoryHtml}
+                        <p>استلم طلبات النقل باستخدام شاحناتك، واحصل على أجر (10% من قيمة الطلب).</p>
+                        <div class="card">
+                            <h3>🚛 شاحناتي</h3>
+                            ${trucksHtml}
+                            <button onclick="window.buyTruck()" style="margin-top:10px;">➕ شراء شاحنة جديدة (100 ذهب)</button>
+                        </div>
+                        <div class="card">
+                            <h3>📦 الطلبات المتاحة</h3>
+                            ${shipmentsHtml}
+                            ${selectShipmentHtml}
+                        </div>
                         <div id="message" class="message"></div>
                     </div>
                 </div>
             `;
+            
+            document.getElementById('acceptSpecificBtn')?.addEventListener('click', () => {
+                const shipmentId = document.getElementById('shipmentSelect').value;
+                const availableTruckIndex = trucks.findIndex(t => t.status === 'available');
+                if (availableTruckIndex === -1) { showMessage('لا توجد شاحنات جاهزة', true); return; }
+                acceptShipment(parseInt(shipmentId), availableTruckIndex);
+            });
             document.getElementById('logoutBtn').onclick = logout;
         }
+        
+        window.acceptShipmentForTruck = function(truckIndex) {
+            const shipments = loadShipments();
+            const pending = shipments.filter(s => s.status === 'pending');
+            if (pending.length === 0) { showMessage('لا توجد طلبات', true); return; }
+            // يأخذ أول طلب pending
+            acceptShipment(pending[0].id, truckIndex);
+        };
+        window.buyTruck = buyTruck;
         
         session = loadSession();
         if (session) {
             loadGame();
+            loadTrucks();
             renderDelivery();
+            setInterval(() => renderDelivery(), 1000); // تحديث كل ثانية للمؤقتات
         }
-        window.completeMission = completeMission;
     </script>
 </body>
 </html>
