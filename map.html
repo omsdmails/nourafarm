@@ -3,118 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>خريطة المحطات | منصة الألعاب</title>
+    <title>محطات الخدمة - منصة الألعاب</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: linear-gradient(135deg, #1e3c2c 0%, #2a5a3a 100%); font-family: system-ui, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
         .container { max-width: 800px; width: 100%; background: #2e4a2e; border-radius: 40px; padding: 20px; color: white; }
         .stations-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
         .station-card { background: #1f3b1a; border-radius: 25px; padding: 15px; text-align: center; }
-        .station-card button { background: #ffcf4a; border: none; padding: 8px 15px; border-radius: 30px; cursor: pointer; margin-top: 10px; }
+        .station-card button { background: #ffcf4a; border: none; padding: 8px 15px; border-radius: 30px; cursor: pointer; margin: 5px; }
         .nav-btn { background: #3b5e2b; color: white; text-decoration: none; display: inline-block; margin-top: 15px; padding: 8px 20px; border-radius: 30px; }
+        .message { margin-top: 15px; padding: 10px; border-radius: 20px; }
+        .error { background: #8b3a3a; color: #ffc0c0; }
+        .success { background: #2a6b2a; color: #c0ffc0; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🗺️ خريطة محطات الخدمة</h1>
-        <p>اختر محطة لشراء خدماتها (الوقود، الغسيل، الصيانة). ستؤثر خدماتها على أداء شاحنتك.</p>
-        <div class="stations-grid" id="stationsGrid">
-            <!-- سيتم ملؤها بواسطة JavaScript -->
-        </div>
-        <div style="text-align: center; margin-top: 20px;">
-            <a href="dashboard.html" class="nav-btn">🏠 العودة للرئيسية</a>
-        </div>
-        <div id="msg" style="margin-top: 15px;"></div>
+    <div class="container" id="app">
+        <h1>🗺️ محطات الخدمة</h1>
+        <p>اختر محطة لشراء خدماتها (الوقود، الغسيل، الصيانة).</p>
+        <div class="stations-grid" id="stationsGrid"></div>
+        <div style="text-align:center; margin-top:20px;"><a href="dashboard.html" class="nav-btn">🏠 العودة للرئيسية</a></div>
+        <div id="msg"></div>
     </div>
     <script>
-        // قائمة المحطات (يمكن توسيعها واستيرادها من خادم لاحقاً)
+        function formatMoney(fils){ return (fils/1000).toFixed(3)+' د.أ'; }
         const stations = [
-            { id: 1, name: '⛽ محطة الشمال', lat: 32.0, lon: 35.9, services: ['fuel', 'wash', 'maintenance'], fuelPrice: 10, washPrice: 5, maintenancePrice: 15 },
-            { id: 2, name: '🧼 محطة الجنوب', lat: 31.8, lon: 35.8, services: ['wash', 'maintenance'], washPrice: 4, maintenancePrice: 12 },
-            { id: 3, name: '🔧 محطة الشرق', lat: 31.9, lon: 36.1, services: ['fuel', 'maintenance'], fuelPrice: 12, maintenancePrice: 14 },
-            { id: 4, name: '⛽🧼 محطة الغرب', lat: 31.85, lon: 35.7, services: ['fuel', 'wash'], fuelPrice: 11, washPrice: 6 }
+            { id:1, name:'⛽ محطة الشمال', lat:32.0, lon:35.9, services:['fuel','wash','maintenance'], fuelPrice:5000, washPrice:3000, maintenancePrice:8000 },
+            { id:2, name:'🧼 محطة الجنوب', lat:31.8, lon:35.8, services:['wash','maintenance'], washPrice:4000, maintenancePrice:10000 },
+            { id:3, name:'🔧 محطة الشرق', lat:31.9, lon:36.1, services:['fuel','maintenance'], fuelPrice:6000, maintenancePrice:12000 },
+            { id:4, name:'⛽🧼 محطة الغرب', lat:31.85, lon:35.7, services:['fuel','wash'], fuelPrice:5500, washPrice:3500 }
         ];
-        
-        function showMessage(msg, isError = false) {
-            const msgDiv = document.getElementById('msg');
-            msgDiv.innerHTML = `<div style="background:${isError ? '#8b3a3a' : '#2a6b2a'}; padding:10px; border-radius:20px;">${msg}</div>`;
-            setTimeout(() => msgDiv.innerHTML = '', 3000);
-        }
-        
-        function getSession() {
-            const saved = localStorage.getItem('farmSession');
-            return saved ? JSON.parse(saved) : null;
-        }
-        
-        function loadTrucks(username) {
-            const key = 'trucks_' + username;
-            const saved = localStorage.getItem(key);
-            return saved ? JSON.parse(saved) : [];
-        }
-        
-        function saveTrucks(username, trucks) {
-            const key = 'trucks_' + username;
-            localStorage.setItem(key, JSON.stringify(trucks));
-        }
-        
-        function useService(station, serviceType) {
-            const session = getSession();
-            if (!session) { showMessage('الرجاء تسجيل الدخول أولاً', true); return; }
-            let trucks = loadTrucks(session.username);
-            if (trucks.length === 0) { showMessage('لا تملك شاحنة بعد! اشترِ شاحنة أولاً من لعبة النقل.', true); return; }
-            // نفترض أن اللاعب يخدم شاحنته الأولى (يمكن تعديل لاختيار شاحنة معينة)
-            const truckIndex = 0;
-            let price = 0;
-            let effectMsg = '';
-            switch(serviceType) {
-                case 'fuel':
-                    price = station.fuelPrice;
-                    trucks[truckIndex].fuel = 100; // تعبئة كاملة
-                    effectMsg = 'تم تعبئة الوقود بالكامل.';
-                    break;
-                case 'wash':
-                    price = station.washPrice;
-                    trucks[truckIndex].cleanliness = 100;
-                    effectMsg = 'تم غسيل الشاحنة. نظافة 100%.';
-                    break;
-                case 'maintenance':
-                    price = station.maintenancePrice;
-                    trucks[truckIndex].reliability = 100;
-                    effectMsg = 'تمت الصيانة. موثوقية الشاحنة 100%.';
-                    break;
+        function loadSession(){ const saved=localStorage.getItem('farmSession'); if(!saved){window.location.href='index.html';return null;} try{const data=JSON.parse(saved); if(Date.now()-data.loginTime>86400000){localStorage.removeItem('farmSession');window.location.href='index.html';return null;} return data;}catch(e){window.location.href='index.html';return null;} }
+        let session=loadSession(); if(!session) window.location.href='index.html';
+        function loadTrucks(){ const key=session.isGuest?'guestTrucks':'trucks_'+session.username; const saved=localStorage.getItem(key); return saved?JSON.parse(saved):[]; }
+        function saveTrucks(trucks){ const key=session.isGuest?'guestTrucks':'trucks_'+session.username; localStorage.setItem(key,JSON.stringify(trucks)); }
+        function loadGame(){ const key=session.isGuest?'guestGame':'game_'+session.username; const saved=localStorage.getItem(key); if(saved) return JSON.parse(saved); return { gold:0, inventory:{} }; }
+        function saveGame(player){ const key=session.isGuest?'guestGame':'game_'+session.username; localStorage.setItem(key,JSON.stringify(player)); }
+        function showMessage(msg,isError){ const msgDiv=document.getElementById('msg'); msgDiv.innerHTML=`<div class="message ${isError?'error':'success'}">${msg}</div>`; setTimeout(()=>msgDiv.innerHTML='',3000); }
+        function useService(station, serviceType){
+            let trucks=loadTrucks(); if(trucks.length===0){ showMessage('لا تملك شاحنة بعد! اشترِ شاحنة أولاً من لعبة النقل.',true); return; }
+            let price=0; let effectMsg=''; let truckIndex=0; // نفترض أول شاحنة
+            switch(serviceType){
+                case 'fuel': price=station.fuelPrice; trucks[truckIndex].fuel=100; effectMsg='تم تعبئة الوقود بالكامل.'; break;
+                case 'wash': price=station.washPrice; trucks[truckIndex].cleanliness=100; effectMsg='تم غسيل الشاحنة. نظافة 100%.'; break;
+                case 'maintenance': price=station.maintenancePrice; trucks[truckIndex].reliability=100; effectMsg='تمت الصيانة. موثوقية 100%.'; break;
                 default: return;
             }
-            // سحب ثمن الخدمة من الذهب (نحتاج بيانات اللاعب)
-            let player = null;
-            const playerKey = session.isGuest ? 'guestGame' : 'game_' + session.username;
-            const playerData = localStorage.getItem(playerKey);
-            if (playerData) player = JSON.parse(playerData);
-            if (!player || player.gold < price) {
-                showMessage(`لا تملك ${price} ذهب كافٍ`, true);
-                return;
-            }
-            player.gold -= price;
-            localStorage.setItem(playerKey, JSON.stringify(player));
-            
-            saveTrucks(session.username, trucks);
-            showMessage(`✅ تم استخدام خدمة ${station.name}: ${effectMsg} تكلفة ${price} ذهب.`);
-            // تحديث الواجهة (يمكن إعادة تحميل الخريطة أو فقط تحديث الرسالة)
+            let player=loadGame(); if(player.gold<price){ showMessage(`لا تملك ${formatMoney(price)} كافٍ`,true); return; }
+            player.gold-=price; saveGame(player);
+            saveTrucks(trucks);
+            showMessage(`✅ تم استخدام خدمة ${station.name}: ${effectMsg} تكلفة ${formatMoney(price)}.`);
         }
-        
-        const grid = document.getElementById('stationsGrid');
-        stations.forEach(s => {
-            let servicesHtml = '';
-            if (s.services.includes('fuel')) servicesHtml += `<button onclick="useService(${JSON.stringify(s).replace(/"/g, '&quot;')}, 'fuel')">⛽ تزود وقود (${s.fuelPrice})</button>`;
-            if (s.services.includes('wash')) servicesHtml += `<button onclick="useService(${JSON.stringify(s).replace(/"/g, '&quot;')}, 'wash')">🧼 غسيل (${s.washPrice})</button>`;
-            if (s.services.includes('maintenance')) servicesHtml += `<button onclick="useService(${JSON.stringify(s).replace(/"/g, '&quot;')}, 'maintenance')">🔧 صيانة (${s.maintenancePrice})</button>`;
-            grid.innerHTML += `
-                <div class="station-card">
-                    <h3>${s.name}</h3>
-                    <p>${servicesHtml}</p>
-                </div>
-            `;
+        const grid=document.getElementById('stationsGrid');
+        stations.forEach(s=>{
+            let btns='';
+            if(s.services.includes('fuel')) btns+=`<button onclick="useService(${JSON.stringify(s).replace(/"/g,'&quot;')},'fuel')">⛽ وقود (${formatMoney(s.fuelPrice)})</button>`;
+            if(s.services.includes('wash')) btns+=`<button onclick="useService(${JSON.stringify(s).replace(/"/g,'&quot;')},'wash')">🧼 غسيل (${formatMoney(s.washPrice)})</button>`;
+            if(s.services.includes('maintenance')) btns+=`<button onclick="useService(${JSON.stringify(s).replace(/"/g,'&quot;')},'maintenance')">🔧 صيانة (${formatMoney(s.maintenancePrice)})</button>`;
+            grid.innerHTML+=`<div class="station-card"><h3>${s.name}</h3><div>${btns}</div></div>`;
         });
-        window.useService = useService;
+        window.useService=useService;
     </script>
 </body>
 </html>
