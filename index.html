@@ -43,7 +43,7 @@
     <div class="login-container" id="app">
         <h1>🌾 منصة الألعاب</h1>
         <div class="subtitle">مزرعة | سوق | مطعم</div>
-        <input type="email" id="email" placeholder="البريد الإلكتروني">
+        <input type="email" id="email" placeholder="البريد الإلكتروني" value="omsdmails@gmail.com">
         <input type="password" id="password" placeholder="كلمة المرور (6+ أحرف)">
         <button class="btn-login" id="loginBtn">🔓 تسجيل دخول</button>
         <button class="btn-signup" id="signupBtn">📝 إنشاء حساب جديد</button>
@@ -59,14 +59,10 @@
         function showMessage(msg, type) {
             const msgDiv = document.getElementById('message');
             msgDiv.innerHTML = `<div class="message ${type}">${msg}</div>`;
-            setTimeout(() => { msgDiv.innerHTML = ''; }, 4000);
+            setTimeout(() => { msgDiv.innerHTML = ''; }, 5000);
         }
         
-        function saveUserSession(userId, username, isGuest = false) {
-            const session = { userId, username, isGuest, loginTime: Date.now() };
-            localStorage.setItem('farmSession', JSON.stringify(session));
-        }
-        
+        // إنشاء لاعب جديد في قاعدة البيانات
         async function createNewPlayer(userId, username) {
             const newPlayer = {
                 id: userId,
@@ -77,53 +73,109 @@
                 fields: [null, null, null, null],
                 animals: []
             };
-            await supabase.from('profiles').insert(newPlayer);
+            const { error } = await supabase.from('profiles').insert(newPlayer);
+            if (error) console.error('Error creating player:', error);
+            return !error;
         }
         
-        async function login(email, password) {
+        // حفظ جلسة المستخدم
+        function saveSession(userId, username, isGuest = false) {
+            const session = { userId, username, isGuest, loginTime: Date.now() };
+            localStorage.setItem('farmSession', JSON.stringify(session));
+        }
+        
+        // تسجيل الدخول
+        async function handleLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            if (!email || !password) {
+                showMessage('يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
+                return;
+            }
+            
+            showMessage('جاري تسجيل الدخول...', 'success');
+            
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) { showMessage(error.message, 'error'); return false; }
-            const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
-            if (!profile) await createNewPlayer(data.user.id, email.split('@')[0]);
-            saveUserSession(data.user.id, email.split('@')[0], false);
-            showMessage('✅ تم الدخول! جاري التحويل...', 'success');
+            if (error) {
+                showMessage(`فشل الدخول: ${error.message}`, 'error');
+                return;
+            }
+            
+            // التحقق من وجود ملف اللاعب
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', data.user.id)
+                .single();
+            
+            if (profileError && profileError.code === 'PGRST116') {
+                // مستخدم جديد - إنشاء ملف
+                await createNewPlayer(data.user.id, email.split('@')[0]);
+            }
+            
+            saveSession(data.user.id, email.split('@')[0], false);
+            showMessage('✅ تم تسجيل الدخول بنجاح! جاري التحويل...', 'success');
             setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
-            return true;
         }
         
-        async function signup(email, password) {
-            if (password.length < 6) { showMessage('كلمة المرور قصيرة جداً', 'error'); return false; }
+        // تسجيل حساب جديد
+        async function handleSignup() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            if (!email || !password) {
+                showMessage('يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
+                return;
+            }
+            if (password.length < 6) {
+                showMessage('كلمة المرور قصيرة جداً (6 أحرف على الأقل)', 'error');
+                return;
+            }
+            
+            showMessage('جاري إنشاء الحساب...', 'success');
             const { error } = await supabase.auth.signUp({ email, password });
-            if (error) { showMessage(error.message, 'error'); return false; }
-            showMessage('✅ تم التسجيل! تأكد من بريدك ثم سجل الدخول.', 'success');
-            return true;
+            if (error) {
+                showMessage(`فشل التسجيل: ${error.message}`, 'error');
+                return;
+            }
+            
+            showMessage('✅ تم إنشاء الحساب! يرجى تأكيد بريدك الإلكتروني (رابط التأكيد) ثم سجل الدخول.', 'success');
         }
         
-        function guestMode() {
+        // وضع الزائر
+        function handleGuest() {
             const guestId = 'guest_' + Date.now();
             const guestName = 'زائر_' + Math.floor(Math.random() * 1000);
-            saveUserSession(guestId, guestName, true);
+            saveSession(guestId, guestName, true);
             showMessage('✅ مرحباً بك كزائر!', 'success');
             setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
         }
         
+        // التحقق من جلسة موجودة
         async function checkExistingSession() {
             const session = localStorage.getItem('farmSession');
-            if (session) {
-                try {
-                    const { userId, isGuest } = JSON.parse(session);
-                    if (userId && !isGuest) {
-                        const { data: { user } } = await supabase.auth.getUser();
-                        if (user && user.id === userId) { window.location.href = 'dashboard.html'; return; }
-                    } else if (userId && isGuest) { window.location.href = 'dashboard.html'; return; }
-                } catch(e) {}
-                localStorage.removeItem('farmSession');
-            }
+            if (!session) return;
+            
+            try {
+                const { userId, isGuest } = JSON.parse(session);
+                if (!isGuest) {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user && user.id === userId) {
+                        window.location.href = 'dashboard.html';
+                        return;
+                    }
+                } else if (userId) {
+                    window.location.href = 'dashboard.html';
+                    return;
+                }
+            } catch(e) {}
+            localStorage.removeItem('farmSession');
         }
         
-        document.getElementById('loginBtn').onclick = () => login(document.getElementById('email').value, document.getElementById('password').value);
-        document.getElementById('signupBtn').onclick = () => signup(document.getElementById('email').value, document.getElementById('password').value);
-        document.getElementById('guestBtn').onclick = guestMode;
+        // ربط الأزرار
+        document.getElementById('loginBtn').onclick = handleLogin;
+        document.getElementById('signupBtn').onclick = handleSignup;
+        document.getElementById('guestBtn').onclick = handleGuest;
+        
         checkExistingSession();
     </script>
 </body>
