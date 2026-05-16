@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>تحديد الموقع | منصة الألعاب</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: linear-gradient(135deg, #1e3c2c 0%, #2a5a3a 100%); font-family: system-ui, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        .container { max-width: 500px; width: 100%; background: #2e4a2e; border-radius: 40px; padding: 30px; text-align: center; color: white; }
+        button { background: #ffcf4a; border: none; padding: 12px 25px; border-radius: 40px; font-weight: bold; cursor: pointer; margin: 10px; }
+        .location-info { background: #1f3b1a; border-radius: 20px; padding: 15px; margin: 15px 0; }
+        .nav-btn { background: #3b5e2b; color: white; text-decoration: none; display: inline-block; margin-top: 10px; }
+        .error { color: #ffaaaa; }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <h1>📍 تحديد موقعك الجغرافي</h1>
+        <p>سيتم استخدام موقعك لتوزيع طلبات النقل بشكل عادل (الأقرب أولاً).</p>
+        <div class="location-info" id="locationInfo">
+            <p>لم يتم تحديد موقع بعد.</p>
+        </div>
+        <button id="getLocationBtn">📍 تحديث موقعي الحالي</button>
+        <button id="useMockBtn">🗺️ استخدام موقع افتراضي (عمان)</button>
+        <div>
+            <a href="dashboard.html" class="nav-btn" style="display:inline-block; padding:8px 20px;">🏠 العودة للرئيسية</a>
+        </div>
+        <div id="msg"></div>
+    </div>
+    <script>
+        function showMessage(msg, isError = false) {
+            const msgDiv = document.getElementById('msg');
+            msgDiv.innerHTML = `<div class="${isError ? 'error' : ''}" style="margin-top:15px;">${msg}</div>`;
+            setTimeout(() => msgDiv.innerHTML = '', 4000);
+        }
+        
+        function saveLocation(lat, lon) {
+            const session = localStorage.getItem('farmSession');
+            if (!session) return;
+            const { username, isGuest } = JSON.parse(session);
+            const key = isGuest ? 'guestLocation' : 'location_' + username;
+            localStorage.setItem(key, JSON.stringify({ lat, lon, updatedAt: Date.now() }));
+            showMessage(`✅ تم حفظ موقعك: خط العرض ${lat.toFixed(4)}، خط الطول ${lon.toFixed(4)}`);
+            updateDisplay(lat, lon);
+        }
+        
+        function updateDisplay(lat, lon) {
+            document.getElementById('locationInfo').innerHTML = `
+                <p>📍 خط العرض: ${lat.toFixed(4)}</p>
+                <p>📍 خط الطول: ${lon.toFixed(4)}</p>
+                <p>🕒 آخر تحديث: ${new Date().toLocaleString()}</p>
+            `;
+        }
+        
+        function getCurrentLocation() {
+            if (!navigator.geolocation) {
+                showMessage('المتصفح لا يدعم تحديد الموقع الجغرافي', true);
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    saveLocation(position.coords.latitude, position.coords.longitude);
+                },
+                (error) => {
+                    let msg = '';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED: msg = 'تم رفض إذن الموقع. يمكنك استخدام موقع افتراضي.'; break;
+                        case error.POSITION_UNAVAILABLE: msg = 'تعذر الحصول على الموقع.'; break;
+                        default: msg = 'خطأ في تحديد الموقع.';
+                    }
+                    showMessage(msg, true);
+                }
+            );
+        }
+        
+        function useMockLocation() {
+            saveLocation(31.9474, 35.9332); // إحداثيات عمان، الأردن
+        }
+        
+        function loadExistingLocation() {
+            const session = localStorage.getItem('farmSession');
+            if (!session) return;
+            const { username, isGuest } = JSON.parse(session);
+            const key = isGuest ? 'guestLocation' : 'location_' + username;
+            const saved = localStorage.getItem(key);
+            if (saved) {
+                const { lat, lon } = JSON.parse(saved);
+                updateDisplay(lat, lon);
+            }
+        }
+        
+        document.getElementById('getLocationBtn').onclick = getCurrentLocation;
+        document.getElementById('useMockBtn').onclick = useMockLocation;
+        loadExistingLocation();
+    </script>
+</body>
+</html>
