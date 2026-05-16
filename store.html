@@ -23,40 +23,6 @@
         .logout-btn { background: #8b5a2b; color: white; }
     </style>
 </head>
-    function buyItem(itemKey) {
-    const item = STORE_ITEMS[itemKey];
-    if (!item) return;
-    if (player.gold < item.price) {
-        showMessage(`⚠️ لا تملك ${item.price} ذهب`, true);
-        return;
-    }
-    player.gold -= item.price;
-    saveGame();
-    
-    // موقع المتجر المركزي ثابت
-    const storeLocation = { lat: 31.9474, lon: 35.9332 };
-    const buyerLocation = getPlayerLocation(session.username);
-    
-    const shipments = loadShipments();
-    const newShipment = {
-        id: Date.now(),
-        from: 'المتجر المركزي',
-        to: session.username,
-        from_location: storeLocation,
-        to_location: buyerLocation,
-        item: itemKey,
-        quantity: 1,
-        status: 'pending',
-        assigned_to: null,
-        assigned_at: null,
-        reward: Math.floor(item.price * 0.1)
-    };
-    shipments.push(newShipment);
-    saveShipments(shipments);
-    
-    showMessage(`✅ تم شراء ${item.emoji} ${item.name}. سيتم توصيله بواسطة لاعب نقل.`, false);
-    renderStore();
-}
 <body>
     <div id="app">⏳ جاري التحميل...</div>
     <script>
@@ -79,39 +45,72 @@
         let session = null;
         let player = null;
         
+        // دوال مساعدة للنقل (يجب أن تكون متطابقة مع الموجودة في market.html و delivery.html)
+        function getPlayerLocation(username) {
+            if (username === 'المتجر المركزي') return { lat: 31.9474, lon: 35.9332 };
+            const key = 'location_' + username;
+            const saved = localStorage.getItem(key);
+            if (saved) return JSON.parse(saved);
+            return null;
+        }
+        
+        function loadShipments() {
+            const all = localStorage.getItem('globalShipments');
+            return all ? JSON.parse(all) : [];
+        }
+        
+        function saveShipments(shipments) {
+            localStorage.setItem('globalShipments', JSON.stringify(shipments));
+        }
+        
         function loadSession() {
             const saved = localStorage.getItem('farmSession');
             if (!saved) { window.location.href = 'index.html'; return null; }
             try {
                 const data = JSON.parse(saved);
-                if (Date.now() - data.loginTime > 86400000) { localStorage.removeItem('farmSession'); window.location.href = 'index.html'; return null; }
+                if (Date.now() - data.loginTime > 86400000) {
+                    localStorage.removeItem('farmSession');
+                    window.location.href = 'index.html';
+                    return null;
+                }
                 return data;
             } catch(e) { window.location.href = 'index.html'; return null; }
         }
         
         function loadGame() {
-            if (session.isGuest) {
-                const guestGame = localStorage.getItem('guestGame');
-                player = guestGame ? JSON.parse(guestGame) : { gold: 100, inventory: {} };
-            } else {
-                const saved = localStorage.getItem('game_' + session.username);
-                player = saved ? JSON.parse(saved) : { gold: 100, inventory: {} };
+            const saved = localStorage.getItem('farmGame_' + session.userId);
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    player = data;
+                } catch(e) {}
+            }
+            if (!player) {
+                player = { gold: 0, score: 0, inventory: {}, fields: [], animals: [] };
             }
             if (!player.inventory) player.inventory = {};
-            if (!player.gold) player.gold = 100;
+            if (!player.animals) player.animals = [];
+            if (!player.fields) player.fields = [null, null, null, null];
         }
         
         function saveGame() {
-            if (session.isGuest) localStorage.setItem('guestGame', JSON.stringify(player));
-            else localStorage.setItem('game_' + session.username, JSON.stringify(player));
+            localStorage.setItem('farmGame_' + session.userId, JSON.stringify({
+                gold: player.gold,
+                score: player.score,
+                fields: player.fields,
+                animals: player.animals,
+                inventory: player.inventory
+            }));
         }
         
         function showMessage(msg, isError = false) {
             const msgDiv = document.getElementById('message');
-            msgDiv.innerHTML = msg;
-            msgDiv.className = isError ? 'message error-message' : 'message';
-            msgDiv.style.display = 'block';
-            setTimeout(() => { msgDiv.style.display = 'none'; }, 3000);
+            if (msgDiv) {
+                msgDiv.innerHTML = msg;
+                msgDiv.className = isError ? 'message error-message' : 'message';
+                msgDiv.style.display = 'block';
+                setTimeout(() => { msgDiv.style.display = 'none'; }, 3000);
+            }
         }
         
         function buyItem(itemKey) {
@@ -121,23 +120,45 @@
                 showMessage(`⚠️ لا تملك ${item.price} ذهب`, true);
                 return;
             }
+            // خصم الذهب أولاً
             player.gold -= item.price;
+            saveGame();
+            
             // إذا كان المنتج حيواناً، نضيفه إلى قائمة الحيوانات في اللاعب (للمزرعة)
             if (item.type === 'حيوانات') {
-                if (!player.animals) player.animals = [];
                 player.animals.push({ type: itemKey, lastCollect: Date.now() - (itemKey === 'Chicken' ? 10000 : (itemKey === 'Cow' ? 20000 : 15000)) });
-            } else {
-                // بذور أو مواد
-                player.inventory[itemKey] = (player.inventory[itemKey] || 0) + 1;
+                saveGame();
+                renderStore();
+                showMessage(`✅ اشتريت ${item.emoji} ${item.name}. تم إضافته إلى حظيرتك.`);
+                return;
             }
-            saveGame();
+            
+            // بالنسبة للبذور والمواد الأخرى: إنشاء طلب نقل
+            const storeLocation = { lat: 31.9474, lon: 35.9332 };
+            const buyerLocation = getPlayerLocation(session.username);
+            const shipments = loadShipments();
+            const newShipment = {
+                id: Date.now(),
+                from: 'المتجر المركزي',
+                to: session.username,
+                from_location: storeLocation,
+                to_location: buyerLocation,
+                item: itemKey,
+                quantity: 1,
+                status: 'pending',
+                assigned_to: null,
+                assigned_at: null,
+                reward: Math.floor(item.price * 0.1)
+            };
+            shipments.push(newShipment);
+            saveShipments(shipments);
+            
             renderStore();
-            showMessage(`✅ اشتريت ${item.emoji} ${item.name}`);
+            showMessage(`✅ تم شراء ${item.emoji} ${item.name}. سيتم توصيله بواسطة لاعب نقل.`);
         }
         
-        function logout() {
-            localStorage.removeItem('farmSession');
-            window.location.href = 'index.html';
+        function logoutToDashboard() {
+            window.location.href = 'dashboard.html';
         }
         
         function renderStore() {
@@ -170,19 +191,18 @@
                         <div class="gold">💰 ${player.gold} ذهب</div>
                         <div>👤 ${session.username}</div>
                         <div class="nav-buttons">
-                            <a href="dashboard.html" class="nav-btn">🏠 الرئيسية</a>
-                            <a href="market.html" class="nav-btn">🛒 السوق</a>
-                            <button class="logout-btn" id="logoutBtn">🚪 خروج</button>
+                            <button class="nav-btn" id="dashboardBtn">🏠 القائمة الرئيسية</button>
                         </div>
                     </div>
                     <div class="content">
                         <h2>🏪 المتجر المركزي</h2>
+                        <p>شراء بذور أو حيوانات. سيتم توصيل البذور عن طريق النقل، والحيوانات تضاف فوراً لحظيرتك.</p>
                         ${storeHtml}
                         <div id="message" class="message"></div>
                     </div>
                 </div>
             `;
-            document.getElementById('logoutBtn').onclick = logout;
+            document.getElementById('dashboardBtn').onclick = logoutToDashboard;
         }
         
         session = loadSession();
@@ -190,6 +210,7 @@
             loadGame();
             renderStore();
         }
+        
         window.buyItem = buyItem;
     </script>
 </body>
