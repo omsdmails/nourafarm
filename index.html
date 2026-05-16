@@ -77,7 +77,7 @@
         <h1>🌾 المزرعة الكبرى</h1>
         <div class="subtitle">سوق مشترك | حيوانات | محاصيل</div>
         
-        <input type="email" id="email" placeholder="البريد الإلكتروني">
+        <input type="email" id="email" placeholder="البريد الإلكتروني" value="omsdmails@gmail.com">
         <input type="password" id="password" placeholder="كلمة المرور (6+ أحرف)">
         
         <button class="btn-login" id="loginBtn">🔓 تسجيل دخول</button>
@@ -91,136 +91,142 @@
     </div>
 
     <script>
-        const SUPABASE_URL = 'https://kzheikbpxicoeohapfjb.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_aVm9aZ6W5vYTVvTxo3hucw__uZ06aId';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
-        function showMessage(msg, type) {
-            const msgDiv = document.getElementById('message');
-            msgDiv.innerHTML = `<div class="message ${type}">${msg}</div>`;
-            setTimeout(() => { msgDiv.innerHTML = ''; }, 4000);
-        }
-        
-        // حفظ بيانات الدخول مؤقتاً
-        function saveUserSession(userId, username, isGuest = false) {
-            const session = { userId, username, isGuest, loginTime: Date.now() };
-            localStorage.setItem('farmSession', JSON.stringify(session));
-        }
-        
-        // إنشاء لاعب جديد في قاعدة البيانات
-        async function createNewPlayer(userId, username) {
-            const newPlayer = {
-                id: userId,
-                username: username,
-                gold: 100,
-                score: 0,
-                inventory: { Wheat: 3, Tomato: 2, Carrot: 1 },
-                fields: [null, null, null, null],
-                animals: []
-            };
+        // انتظار تحميل الصفحة بالكامل
+        document.addEventListener('DOMContentLoaded', function() {
             
-            const { error } = await supabase.from('profiles').insert(newPlayer);
-            if (error) console.error('Error creating player:', error);
-            return newPlayer;
-        }
-        
-        // تسجيل الدخول
-        async function login(email, password) {
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) {
-                showMessage(error.message, 'error');
-                return false;
+            const SUPABASE_URL = 'https://kzheikbpxicoeohapfjb.supabase.co';
+            const SUPABASE_ANON_KEY = 'sb_publishable_aVm9aZ6W5vYTVvTxo3hucw__uZ06aId';
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            
+            function showMessage(msg, type) {
+                const msgDiv = document.getElementById('message');
+                msgDiv.innerHTML = `<div class="message ${type}">${msg}</div>`;
+                setTimeout(() => { msgDiv.innerHTML = ''; }, 4000);
             }
             
-            // التحقق من وجود ملف اللاعب
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', data.user.id)
-                .single();
-            
-            if (profileError && profileError.code === 'PGRST116') {
-                // لاعب جديد - إنشاء ملف
-                await createNewPlayer(data.user.id, email.split('@')[0]);
+            // حفظ بيانات الدخول مؤقتاً
+            function saveUserSession(userId, username, isGuest = false) {
+                const session = { userId, username, isGuest, loginTime: Date.now() };
+                localStorage.setItem('farmSession', JSON.stringify(session));
             }
             
-            saveUserSession(data.user.id, email.split('@')[0], false);
-            showMessage('✅ تم تسجيل الدخول بنجاح! جاري التحويل...', 'success');
-            setTimeout(() => { window.location.href = 'farm.html'; }, 1000);
-            return true;
-        }
-        
-        // تسجيل حساب جديد
-        async function signup(email, password) {
-            if (password.length < 6) {
-                showMessage('كلمة المرور قصيرة جداً (6 أحرف على الأقل)', 'error');
-                return false;
+            // إنشاء لاعب جديد في قاعدة البيانات
+            async function createNewPlayer(userId, username) {
+                const newPlayer = {
+                    id: userId,
+                    username: username,
+                    gold: 100,
+                    score: 0,
+                    inventory: { Wheat: 3, Tomato: 2, Carrot: 1 },
+                    fields: [null, null, null, null],
+                    animals: []
+                };
+                
+                const { error } = await supabase.from('profiles').insert(newPlayer);
+                if (error) console.error('Error creating player:', error);
+                return newPlayer;
             }
             
-            const { data, error } = await supabase.auth.signUp({ email, password });
-            if (error) {
-                showMessage(error.message, 'error');
-                return false;
+            // تسجيل الدخول
+            async function login(email, password) {
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) {
+                    showMessage(error.message, 'error');
+                    return false;
+                }
+                
+                // التحقق من وجود ملف اللاعب
+                const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', data.user.id)
+                    .single();
+                
+                if (profileError && profileError.code === 'PGRST116') {
+                    // لاعب جديد - إنشاء ملف
+                    await createNewPlayer(data.user.id, email.split('@')[0]);
+                }
+                
+                saveUserSession(data.user.id, email.split('@')[0], false);
+                showMessage('✅ تم تسجيل الدخول بنجاح! جاري التحويل...', 'success');
+                setTimeout(() => { window.location.href = 'farm.html'; }, 1000);
+                return true;
             }
             
-            showMessage('✅ تم إنشاء الحساب! يرجى تأكيد بريدك الإلكتروني ثم تسجيل الدخول.', 'success');
-            return true;
-        }
-        
-        // وضع الزائر (بدون حساب)
-        function guestMode() {
-            const guestId = 'guest_' + Date.now();
-            const guestName = 'زائر_' + Math.floor(Math.random() * 1000);
-            saveUserSession(guestId, guestName, true);
-            showMessage('✅ مرحباً بك كزائر! البيانات لن تحفظ.', 'success');
-            setTimeout(() => { window.location.href = 'farm.html'; }, 1000);
-        }
-        
-        // التحقق من جلسة حالية
-        async function checkExistingSession() {
-            const session = localStorage.getItem('farmSession');
-            if (session) {
-                try {
-                    const { userId, isGuest } = JSON.parse(session);
-                    if (userId && !isGuest) {
-                        const { data: { user } } = await supabase.auth.getUser();
-                        if (user && user.id === userId) {
+            // تسجيل حساب جديد
+            async function signup(email, password) {
+                if (password.length < 6) {
+                    showMessage('كلمة المرور قصيرة جداً (6 أحرف على الأقل)', 'error');
+                    return false;
+                }
+                
+                const { data, error } = await supabase.auth.signUp({ email, password });
+                if (error) {
+                    showMessage(error.message, 'error');
+                    return false;
+                }
+                
+                showMessage('✅ تم إنشاء الحساب! يرجى تأكيد بريدك الإلكتروني ثم تسجيل الدخول.', 'success');
+                return true;
+            }
+            
+            // وضع الزائر (بدون حساب)
+            function guestMode() {
+                const guestId = 'guest_' + Date.now();
+                const guestName = 'زائر_' + Math.floor(Math.random() * 1000);
+                saveUserSession(guestId, guestName, true);
+                showMessage('✅ مرحباً بك كزائر! البيانات لن تحفظ.', 'success');
+                setTimeout(() => { window.location.href = 'farm.html'; }, 1000);
+            }
+            
+            // التحقق من جلسة حالية
+            async function checkExistingSession() {
+                const session = localStorage.getItem('farmSession');
+                if (session) {
+                    try {
+                        const { userId, isGuest } = JSON.parse(session);
+                        if (userId && !isGuest) {
+                            const { data: { user } } = await supabase.auth.getUser();
+                            if (user && user.id === userId) {
+                                window.location.href = 'farm.html';
+                                return;
+                            }
+                        } else if (userId && isGuest) {
                             window.location.href = 'farm.html';
                             return;
                         }
-                    } else if (userId && isGuest) {
-                        window.location.href = 'farm.html';
-                        return;
-                    }
-                } catch(e) {}
+                    } catch(e) {}
+                }
+                localStorage.removeItem('farmSession');
             }
-            localStorage.removeItem('farmSession');
-        }
-        
-        // ربط الأزرار
-        document.getElementById('loginBtn').onclick = () => {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            if (!email || !password) {
-                showMessage('يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
-                return;
-            }
-            login(email, password);
-        };
-        
-        document.getElementById('signupBtn').onclick = () => {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            if (!email || !password) {
-                showMessage('يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
-                return;
-            }
-            signup(email, password);
-        };
-        
-        document.getElementById('guestBtn').onclick = () => guestMode();
-        
-        checkExistingSession();
+            
+            // ربط الأزرار
+            document.getElementById('loginBtn').onclick = function() {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                if (!email || !password) {
+                    showMessage('يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
+                    return;
+                }
+                login(email, password);
+            };
+            
+            document.getElementById('signupBtn').onclick = function() {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                if (!email || !password) {
+                    showMessage('يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
+                    return;
+                }
+                signup(email, password);
+            };
+            
+            document.getElementById('guestBtn').onclick = function() {
+                guestMode();
+            };
+            
+            checkExistingSession();
+        });
     </script>
 </body>
 </html>
