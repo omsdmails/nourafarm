@@ -28,6 +28,55 @@
         .empty-market { text-align: center; padding: 20px; color: #c5e0b4; }
     </style>
 </head>
+    // الدوال الجديدة (أضفها في script)
+function getPlayerLocation(username) {
+    if (username === 'المتجر المركزي') return { lat: 31.9474, lon: 35.9332 };
+    const key = 'location_' + username;
+    const saved = localStorage.getItem(key);
+    if (saved) return JSON.parse(saved);
+    return null;
+}
+
+// تعديل دالة buyListing لتصبح:
+async function buyListing(listingId, pricePerUnit, qty, itemName, sellerName) {
+    const total = pricePerUnit * qty;
+    if (player.gold < total) { showMessage(`⚠️ تحتاج ${total} ذهب`, true); return; }
+    if (sellerName === session.username) { showMessage(`⚠️ لا يمكنك شراء منتجك الخاص`, true); return; }
+    
+    // خصم الذهب من المشتري
+    player.gold -= total;
+    saveGame();
+    
+    // الحصول على مواقع البائع والمشتري
+    const sellerLocation = getPlayerLocation(sellerName);
+    const buyerLocation = getPlayerLocation(session.username);
+    
+    // إنشاء طلب نقل
+    const shipments = loadShipments();
+    const newShipment = {
+        id: Date.now(),
+        from: sellerName,
+        to: session.username,
+        from_location: sellerLocation,
+        to_location: buyerLocation,
+        item: itemName,
+        quantity: qty,
+        status: 'pending',
+        assigned_to: null,
+        assigned_at: null,
+        reward: Math.floor(total * 0.1) // 10%
+    };
+    shipments.push(newShipment);
+    saveShipments(shipments);
+    
+    // إزالة الإعلان من السوق
+    const listings = loadMarketListings();
+    const newListings = listings.filter(l => l.id !== listingId);
+    saveMarketListings(newListings);
+    
+    showMessage(`🛒 تم شراء ${qty} ${itemName}. سيتم توصيله بواسطة لاعب نقل (تحديد السعر حسب المسافة)`, false);
+    renderMarket();
+}
 <body>
     <div id="app">⏳ جاري التحميل...</div>
     <script>
