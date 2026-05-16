@@ -38,7 +38,7 @@
             flex-wrap: wrap;
             gap: 10px;
         }
-        .ad-section .gold-display {
+        .gold-display {
             background: #ffcf4a;
             color: #1f3b1a;
             padding: 8px 16px;
@@ -54,7 +54,6 @@
             cursor: pointer;
             font-size: 16px;
         }
-        .ad-btn:active { transform: scale(0.97); }
         .games-grid {
             display: flex;
             flex-wrap: wrap;
@@ -98,8 +97,6 @@
             flex-wrap: wrap;
             gap: 10px;
         }
-        hr { border-color: #4f7840; margin: 15px 0; }
-        .msg { margin-top: 8px; font-size: 13px; color: #aaffaa; }
     </style>
 </head>
 <body>
@@ -108,14 +105,13 @@
         <div class="subtitle">اختر لعبتك المفضلة</div>
         <div class="user-info" id="userInfo"></div>
         
-        <!-- قسم الإعلان والرصيد -->
         <div class="ad-section">
-            <div class="gold-display" id="goldAmount">💰 0 ذهب</div>
-            <button class="ad-btn" id="watchAdBtn">📺 مشاهدة إعلان (احصل على 50 ذهب)</button>
-            <div id="adMsg" class="msg"></div>
+            <div class="gold-display" id="goldAmount">💰 0.000 دينار</div>
+            <button class="ad-btn" id="watchAdBtn">📺 مشاهدة إعلان (احصل على 0.050 دينار)</button>
+            <div id="adMsg" style="font-size:12px; color:#aaffaa;"></div>
         </div>
 
-        <div class="games-grid" id="gamesGrid">
+        <div class="games-grid">
             <div class="game-card" onclick="window.location.href='location.html'">
                 <div class="emoji">📍</div>
                 <h3>تحديد موقعي</h3>
@@ -166,38 +162,12 @@
         <button class="logout-btn" id="logoutBtn">🚪 تسجيل خروج</button>
     </div>
     <script>
-        // دالة تحديث عرض الذهب
-        function updateGoldDisplay() {
-            const session = loadSession();
-            if (!session) return;
-            const key = session.isGuest ? 'guestGame' : 'game_' + session.username;
-            const data = localStorage.getItem(key);
-            if (data) {
-                const player = JSON.parse(data);
-                const goldAmount = player.gold || 0;
-                document.getElementById('goldAmount').innerHTML = `💰 ${goldAmount} ذهب`;
-            } else {
-                document.getElementById('goldAmount').innerHTML = '💰 0 ذهب';
-            }
+        // دالة تحويل الفلس إلى دينار (1 دينار = 1000 فلس)
+        function formatMoney(fils) {
+            let dinars = fils / 1000;
+            return dinars.toFixed(3) + ' دينار';
         }
-
-        // إضافة 50 ذهب بعد مشاهدة الإعلان (محاكاة)
-        function addGoldFromAd() {
-            const session = loadSession();
-            if (!session) {
-                document.getElementById('adMsg').innerHTML = '<span style="color:#ffaaaa;">⚠️ يرجى تسجيل الدخول أولاً</span>';
-                setTimeout(() => document.getElementById('adMsg').innerHTML = '', 2000);
-                return;
-            }
-            const key = session.isGuest ? 'guestGame' : 'game_' + session.username;
-            let player = localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key)) : { gold: 0, inventory: {} };
-            player.gold = (player.gold || 0) + 50;
-            localStorage.setItem(key, JSON.stringify(player));
-            updateGoldDisplay();
-            document.getElementById('adMsg').innerHTML = '<span style="color:#aaffaa;">✅ تمت إضافة 50 ذهب!</span>';
-            setTimeout(() => document.getElementById('adMsg').innerHTML = '', 2500);
-        }
-
+        
         function loadSession() {
             const saved = localStorage.getItem('farmSession');
             if (!saved) return null;
@@ -208,11 +178,40 @@
                     return null;
                 }
                 return data;
-            } catch(e) {
-                return null;
+            } catch(e) { return null; }
+        }
+        
+        function updateGoldDisplay() {
+            const session = loadSession();
+            if (!session) return;
+            const key = session.isGuest ? 'guestGame' : 'game_' + session.username;
+            const data = localStorage.getItem(key);
+            if (data) {
+                const player = JSON.parse(data);
+                const goldFils = player.gold || 0;
+                document.getElementById('goldAmount').innerHTML = `💰 ${formatMoney(goldFils)}`;
+            } else {
+                document.getElementById('goldAmount').innerHTML = '💰 0.000 دينار';
             }
         }
-
+        
+        function addGoldFromAd() {
+            const session = loadSession();
+            if (!session) {
+                document.getElementById('adMsg').innerHTML = '⚠️ يرجى تسجيل الدخول أولاً';
+                setTimeout(() => document.getElementById('adMsg').innerHTML = '', 2000);
+                return;
+            }
+            const key = session.isGuest ? 'guestGame' : 'game_' + session.username;
+            let player = localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key)) : { gold: 0, inventory: {} };
+            // إضافة 50 فلس = 0.050 دينار
+            player.gold = (player.gold || 0) + 50;
+            localStorage.setItem(key, JSON.stringify(player));
+            updateGoldDisplay();
+            document.getElementById('adMsg').innerHTML = '✅ تمت إضافة 0.050 دينار (50 فلس)';
+            setTimeout(() => document.getElementById('adMsg').innerHTML = '', 2500);
+        }
+        
         const session = loadSession();
         if (session) {
             document.getElementById('userInfo').innerHTML = `
@@ -223,11 +222,10 @@
             document.getElementById('refreshBtn').onclick = () => location.reload();
             updateGoldDisplay();
         } else {
-            // إذا لم توجد جلسة، نعرض رسالة ونعيد التوجيه لتسجيل الدخول بعد لحظة
             document.getElementById('userInfo').innerHTML = '<span>⚠️ لم يتم تسجيل الدخول</span>';
             setTimeout(() => { window.location.href = 'index.html'; }, 2000);
         }
-
+        
         document.getElementById('logoutBtn').onclick = () => {
             localStorage.removeItem('farmSession');
             window.location.href = 'index.html';
