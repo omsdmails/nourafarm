@@ -119,6 +119,17 @@
             renderDelivery();
             showMessage(`🚛 تم استلام الطلب. المسافة: ${distance.toFixed(1)} كم، وقت التوصيل المتوقع: ${travelTimeSec} ثانية.`, false);
         }
+        trucks.push({ 
+    id: Date.now(), 
+    name: 'شاحنة صغيرة', 
+    status: 'available', 
+    missionEndTime: 0, 
+    assignedShipmentId: null, 
+    completedMissions: 0,
+    fuel: 100,        // نسبة الوقود 0-100
+    cleanliness: 80,  // نسبة النظافة 0-100
+    reliability: 90   // نسبة الموثوقية 0-100
+});
         
         // ========== إنهاء المهمات ==========
         function checkCompletedMissions() {
