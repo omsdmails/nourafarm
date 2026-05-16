@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>تسجيل الدخول - منصة الألعاب</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -43,140 +42,126 @@
     <div class="login-container" id="app">
         <h1>🌾 منصة الألعاب</h1>
         <div class="subtitle">مزرعة | سوق | مطعم</div>
-        <input type="email" id="email" placeholder="البريد الإلكتروني" value="omsdmails@gmail.com">
-        <input type="password" id="password" placeholder="كلمة المرور (6+ أحرف)">
+        <input type="text" id="username" placeholder="اسم المستخدم">
+        <input type="password" id="password" placeholder="كلمة المرور">
         <button class="btn-login" id="loginBtn">🔓 تسجيل دخول</button>
         <button class="btn-signup" id="signupBtn">📝 إنشاء حساب جديد</button>
         <hr>
-        <button class="guest-btn" id="guestBtn">👤 لعب كزائر (بدون حفظ)</button>
+        <button class="guest-btn" id="guestBtn">👤 لعب كزائر</button>
         <div id="message"></div>
     </div>
     <script>
-        const SUPABASE_URL = 'https://kzheikbpxicoeohapfjb.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_aVm9aZ6W5vYTVvTxo3hucw__uZ06aId';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // نظام تسجيل دخول داخلي (باستخدام localStorage فقط)
         
-        function showMessage(msg, type) {
-            const msgDiv = document.getElementById('message');
-            msgDiv.innerHTML = `<div class="message ${type}">${msg}</div>`;
-            setTimeout(() => { msgDiv.innerHTML = ''; }, 5000);
+        // الحصول على قائمة المستخدمين من localStorage
+        function getUsers() {
+            const users = localStorage.getItem('app_users');
+            return users ? JSON.parse(users) : {};
         }
         
-        // إنشاء لاعب جديد في قاعدة البيانات
-        async function createNewPlayer(userId, username) {
-            const newPlayer = {
-                id: userId,
-                username: username,
+        // حفظ قائمة المستخدمين
+        function saveUsers(users) {
+            localStorage.setItem('app_users', JSON.stringify(users));
+        }
+        
+        // تسجيل حساب جديد
+        function signup() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const msgDiv = document.getElementById('message');
+            
+            if (!username || !password) {
+                msgDiv.innerHTML = '<div class="message error">يرجى إدخال اسم المستخدم وكلمة المرور</div>';
+                return;
+            }
+            if (password.length < 4) {
+                msgDiv.innerHTML = '<div class="message error">كلمة المرور قصيرة جداً (4 أحرف على الأقل)</div>';
+                return;
+            }
+            
+            const users = getUsers();
+            if (users[username]) {
+                msgDiv.innerHTML = '<div class="message error">اسم المستخدم موجود مسبقاً</div>';
+                return;
+            }
+            
+            // تخزين كلمة المرور (بتشفير بسيط Base64 للتجربة)
+            users[username] = btoa(password);
+            saveUsers(users);
+            
+            // إنشاء بيانات اللاعب الجديد
+            const defaultGameData = {
                 gold: 100,
                 score: 0,
                 inventory: { Wheat: 3, Tomato: 2, Carrot: 1 },
                 fields: [null, null, null, null],
                 animals: []
             };
-            const { error } = await supabase.from('profiles').insert(newPlayer);
-            if (error) console.error('Error creating player:', error);
-            return !error;
-        }
-        
-        // حفظ جلسة المستخدم
-        function saveSession(userId, username, isGuest = false) {
-            const session = { userId, username, isGuest, loginTime: Date.now() };
-            localStorage.setItem('farmSession', JSON.stringify(session));
+            localStorage.setItem(`game_${username}`, JSON.stringify(defaultGameData));
+            
+            msgDiv.innerHTML = '<div class="message success">✅ تم إنشاء الحساب! يمكنك تسجيل الدخول الآن</div>';
+            document.getElementById('password').value = '';
         }
         
         // تسجيل الدخول
-        async function handleLogin() {
-            const email = document.getElementById('email').value;
+        function login() {
+            const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
-            if (!email || !password) {
-                showMessage('يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
+            const msgDiv = document.getElementById('message');
+            
+            if (!username || !password) {
+                msgDiv.innerHTML = '<div class="message error">يرجى إدخال اسم المستخدم وكلمة المرور</div>';
                 return;
             }
             
-            showMessage('جاري تسجيل الدخول...', 'success');
-            
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) {
-                showMessage(`فشل الدخول: ${error.message}`, 'error');
+            const users = getUsers();
+            if (!users[username]) {
+                msgDiv.innerHTML = '<div class="message error">اسم المستخدم غير موجود</div>';
                 return;
             }
             
-            // التحقق من وجود ملف اللاعب
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', data.user.id)
-                .single();
-            
-            if (profileError && profileError.code === 'PGRST116') {
-                // مستخدم جديد - إنشاء ملف
-                await createNewPlayer(data.user.id, email.split('@')[0]);
+            if (atob(users[username]) !== password) {
+                msgDiv.innerHTML = '<div class="message error">كلمة المرور غير صحيحة</div>';
+                return;
             }
             
-            saveSession(data.user.id, email.split('@')[0], false);
-            showMessage('✅ تم تسجيل الدخول بنجاح! جاري التحويل...', 'success');
+            // حفظ جلسة المستخدم
+            const session = { username, loginTime: Date.now() };
+            localStorage.setItem('farmSession', JSON.stringify(session));
+            
+            msgDiv.innerHTML = '<div class="message success">✅ تم تسجيل الدخول! جاري التحويل...</div>';
             setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
-        }
-        
-        // تسجيل حساب جديد
-        async function handleSignup() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            if (!email || !password) {
-                showMessage('يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
-                return;
-            }
-            if (password.length < 6) {
-                showMessage('كلمة المرور قصيرة جداً (6 أحرف على الأقل)', 'error');
-                return;
-            }
-            
-            showMessage('جاري إنشاء الحساب...', 'success');
-            const { error } = await supabase.auth.signUp({ email, password });
-            if (error) {
-                showMessage(`فشل التسجيل: ${error.message}`, 'error');
-                return;
-            }
-            
-            showMessage('✅ تم إنشاء الحساب! يرجى تأكيد بريدك الإلكتروني (رابط التأكيد) ثم سجل الدخول.', 'success');
         }
         
         // وضع الزائر
-        function handleGuest() {
+        function guestMode() {
             const guestId = 'guest_' + Date.now();
-            const guestName = 'زائر_' + Math.floor(Math.random() * 1000);
-            saveSession(guestId, guestName, true);
-            showMessage('✅ مرحباً بك كزائر!', 'success');
+            const session = { username: 'زائر', isGuest: true, guestId, loginTime: Date.now() };
+            localStorage.setItem('farmSession', JSON.stringify(session));
+            document.getElementById('message').innerHTML = '<div class="message success">✅ مرحباً بك كزائر! جاري التحويل...</div>';
             setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
         }
         
-        // التحقق من جلسة موجودة
-        async function checkExistingSession() {
+        // التحقق من جلسة نشطة
+        function checkSession() {
             const session = localStorage.getItem('farmSession');
-            if (!session) return;
-            
-            try {
-                const { userId, isGuest } = JSON.parse(session);
-                if (!isGuest) {
-                    const { data: { user } } = await supabase.auth.getUser();
-                    if (user && user.id === userId) {
+            if (session) {
+                try {
+                    const { loginTime } = JSON.parse(session);
+                    if (Date.now() - loginTime < 86400000) {
                         window.location.href = 'dashboard.html';
-                        return;
+                    } else {
+                        localStorage.removeItem('farmSession');
                     }
-                } else if (userId) {
-                    window.location.href = 'dashboard.html';
-                    return;
-                }
-            } catch(e) {}
-            localStorage.removeItem('farmSession');
+                } catch(e) {}
+            }
         }
         
-        // ربط الأزرار
-        document.getElementById('loginBtn').onclick = handleLogin;
-        document.getElementById('signupBtn').onclick = handleSignup;
-        document.getElementById('guestBtn').onclick = handleGuest;
+        document.getElementById('signupBtn').onclick = signup;
+        document.getElementById('loginBtn').onclick = login;
+        document.getElementById('guestBtn').onclick = guestMode;
         
-        checkExistingSession();
+        checkSession();
     </script>
 </body>
 </html>
