@@ -16,7 +16,9 @@
         .recipe-card { background: #1f3b1a; border-radius: 20px; padding: 15px; margin: 10px 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .recipe-card button { background: #ffcf4a; border: none; padding: 8px 20px; border-radius: 30px; cursor: pointer; font-weight: bold; }
         .recipe-card button:disabled { background: #6d6d6d; cursor: not-allowed; opacity: 0.6; }
-        .ingredients { font-size: 13px; color: #c5e0b4; }
+        .ingredients { font-size: 13px; color: #c5e0b4; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 5px; }
+        .ingredient-badge { background: #3b5e2b; border-radius: 30px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 8px; }
+        .buy-from-market { background: #8b5a2b; color: white; padding: 2px 8px; border-radius: 30px; font-size: 11px; text-decoration: none; }
         .inventory-list { background: #1f3b1a; border-radius: 20px; padding: 15px; margin-top: 20px; }
         .inventory-item { background: #3b5e2b; border-radius: 30px; padding: 5px 12px; display: inline-block; margin: 4px; font-size: 13px; }
         hr { border-color: #4f7840; margin: 15px 0; }
@@ -39,6 +41,7 @@
             "عصير بطيخ": { emoji: "🧃", ingredients: { "Watermelon": 1 }, sellPrice: 18, desc: "عصير طبيعي منعش" }
         };
         let session = null, player = null;
+        
         function loadSession() {
             const saved = localStorage.getItem('farmSession');
             if (!saved) { window.location.href = 'index.html'; return null; }
@@ -48,49 +51,124 @@
                 return data;
             } catch(e) { window.location.href = 'index.html'; return null; }
         }
+        
         function loadGame() {
             const saved = localStorage.getItem('farmGame_' + session.userId);
             if (saved) { try { const data = JSON.parse(saved); player = data; if (!player.inventory) player.inventory = {}; if (!player.gold) player.gold = 100; } catch(e) {} }
             if (!player) player = { gold: 100, score: 0, inventory: { Wheat: 3, Carrot: 2 }, fields: [], animals: [] };
         }
-        function saveGame() { localStorage.setItem('farmGame_' + session.userId, JSON.stringify({ gold: player.gold, score: player.score, fields: player.fields||[], animals: player.animals||[], inventory: player.inventory })); }
+        
+        function saveGame() { 
+            localStorage.setItem('farmGame_' + session.userId, JSON.stringify({ 
+                gold: player.gold, score: player.score, fields: player.fields||[], animals: player.animals||[], inventory: player.inventory 
+            })); 
+        }
+        
         function showMessage(msg, isError = false) {
             const msgDiv = document.getElementById('message');
-            if(msgDiv) { msgDiv.innerHTML = msg; msgDiv.className = isError ? 'message error-message' : 'message'; msgDiv.style.display = 'block'; setTimeout(() => { msgDiv.style.display = 'none'; }, 3000); }
+            if(msgDiv) { 
+                msgDiv.innerHTML = msg; 
+                msgDiv.className = isError ? 'message error-message' : 'message'; 
+                msgDiv.style.display = 'block'; 
+                setTimeout(() => { msgDiv.style.display = 'none'; }, 3000); 
+            }
         }
+        
+        // شراء المكون الناقص من السوق (فتح صفحة السوق مع تحديد العنصر)
+        function buyFromMarket(ingredient) {
+            // نخزن مؤقتاً اسم المنتج الذي يريد شراءه في localStorage ليتم التركيز عليه في السوق
+            localStorage.setItem('market_focus_item', ingredient);
+            window.location.href = 'market.html';
+        }
+        
         function cook(recipeName) {
             const recipe = RECIPES[recipeName];
-            for (let [ing, qty] of Object.entries(recipe.ingredients)) if (!player.inventory[ing] || player.inventory[ing] < qty) { showMessage(`⚠️ لا تملك ${qty} من ${ing}`, true); return; }
+            let missing = [];
+            for (let [ing, qty] of Object.entries(recipe.ingredients)) {
+                if (!player.inventory[ing] || player.inventory[ing] < qty) missing.push(ing);
+            }
+            if (missing.length > 0) {
+                let msg = `⚠️ المكونات الناقصة: ${missing.join(', ')}. `;
+                msg += `يمكنك شراؤها من السوق.`;
+                showMessage(msg, true);
+                return;
+            }
             for (let [ing, qty] of Object.entries(recipe.ingredients)) player.inventory[ing] -= qty;
-            player.gold += recipe.sellPrice; player.score += 2;
-            saveGame(); renderRestaurant(); showMessage(`🍳 تم طهي ${recipe.emoji} ${recipeName}! +${recipe.sellPrice} ذهب`);
+            player.gold += recipe.sellPrice;
+            player.score += 2;
+            saveGame();
+            renderRestaurant();
+            showMessage(`🍳 تم طهي ${recipe.emoji} ${recipeName}! +${recipe.sellPrice} ذهب`);
         }
+        
         function logoutToDashboard() { window.location.href = 'dashboard.html'; }
+        
         function renderRestaurant() {
             let inventoryHtml = '';
-            for (let [item, qty] of Object.entries(player.inventory)) if (qty > 0) inventoryHtml += `<span class="inventory-item">📦 ${item}: ${qty}</span>`;
-            if (inventoryHtml === '') inventoryHtml = '<p>مخزنك فارغ، اذهب إلى المزرعة لجمع المحاصيل</p>';
+            for (let [item, qty] of Object.entries(player.inventory)) 
+                if (qty > 0) inventoryHtml += `<span class="inventory-item">📦 ${item}: ${qty}</span>`;
+            if (inventoryHtml === '') inventoryHtml = '<p>مخزنك فارغ، يمكنك شراء المواد من السوق</p>';
+            
             let recipesHtml = '';
             for (let [name, recipe] of Object.entries(RECIPES)) {
-                let ingredientsList = ''; let canCook = true;
+                let ingredientsHtml = '';
+                let canCook = true;
                 for (let [ing, qty] of Object.entries(recipe.ingredients)) {
                     const available = player.inventory[ing] || 0;
-                    const color = available >= qty ? '#aaf0a0' : '#ffaaaa';
-                    ingredientsList += `<span style="color:${color}">${ing} (${available}/${qty})</span> `;
-                    if (available < qty) canCook = false;
+                    const hasEnough = available >= qty;
+                    if (!hasEnough) canCook = false;
+                    ingredientsHtml += `
+                        <div class="ingredient-badge">
+                            ${ing} (${available}/${qty})
+                            ${!hasEnough ? `<a class="buy-from-market" href="#" onclick="event.preventDefault(); window.buyFromMarket('${ing}'); return false;">🛒 شراء</a>` : ''}
+                        </div>
+                    `;
                 }
-                recipesHtml += `<div class="recipe-card"><div><strong>${recipe.emoji} ${name}</strong> - 💰 ${recipe.sellPrice} ذهب<br><div class="ingredients">📦 المكونات: ${ingredientsList}</div><div style="font-size:11px;">${recipe.desc}</div></div><button onclick="window.cook('${name}')" ${!canCook ? 'disabled' : ''}>🍳 طهي</button></div>`;
+                recipesHtml += `
+                    <div class="recipe-card">
+                        <div>
+                            <strong>${recipe.emoji} ${name}</strong> - 💰 ${recipe.sellPrice} ذهب
+                            <div class="ingredients">${ingredientsHtml}</div>
+                            <div style="font-size:11px;">${recipe.desc}</div>
+                        </div>
+                        <button onclick="window.cook('${name}')" ${!canCook ? 'disabled' : ''}>🍳 طهي</button>
+                    </div>
+                `;
             }
+            
             document.getElementById('app').innerHTML = `
                 <div class="restaurant-container">
-                    <div class="header"><div class="gold">💰 ${player.gold} ذهب</div><div>⭐ ${player.score} نقطة</div><div class="nav-buttons"><button class="nav-btn" id="dashboardBtn">🏠 القائمة الرئيسية</button></div></div>
-                    <div class="content"><h2>🍽️ المطعم</h2><p>اطبخ وجبات لذيذة وبيعها بربح أعلى!</p><div id="recipesList">${recipesHtml}</div><hr><div class="inventory-list"><h3>📦 مخزونك الحالي</h3>${inventoryHtml}</div><div id="message" class="message"></div></div>
-                </div>`;
+                    <div class="header">
+                        <div class="gold">💰 ${player.gold} ذهب</div>
+                        <div>⭐ ${player.score} نقطة</div>
+                        <div class="nav-buttons">
+                            <button class="nav-btn" id="dashboardBtn">🏠 القائمة الرئيسية</button>
+                        </div>
+                    </div>
+                    <div class="content">
+                        <h2>🍽️ المطعم</h2>
+                        <p>اطبخ وجبات لذيذة وبيعها بربح أعلى!</p>
+                        <div id="recipesList">${recipesHtml}</div>
+                        <hr>
+                        <div class="inventory-list">
+                            <h3>📦 مخزونك الحالي</h3>
+                            ${inventoryHtml}
+                        </div>
+                        <div id="message" class="message"></div>
+                    </div>
+                </div>
+            `;
             document.getElementById('dashboardBtn').onclick = logoutToDashboard;
         }
+        
         session = loadSession();
-        if (session) { loadGame(); renderRestaurant(); }
+        if (session) { 
+            loadGame(); 
+            renderRestaurant(); 
+        }
+        
         window.cook = cook;
+        window.buyFromMarket = buyFromMarket;
     </script>
 </body>
 </html>
