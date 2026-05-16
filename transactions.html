@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>سجل التحويلات - منصة الألعاب</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: linear-gradient(135deg, #1e3c2c 0%, #2a5a3a 100%); font-family: system-ui; display: flex; justify-content: center; padding: 20px; }
+        .container { max-width: 600px; width: 100%; background: #2e4a2e; border-radius: 30px; padding: 20px; color: white; }
+        .transaction { background: #1f3b1a; border-radius: 20px; padding: 12px; margin: 8px 0; display: flex; justify-content: space-between; flex-wrap: wrap; }
+        .nav-btn { background: #3b5e2b; color: white; text-decoration: none; display: inline-block; margin-top: 15px; padding: 8px 20px; border-radius: 30px; }
+        .positive { color: #aaffaa; }
+        .negative { color: #ffaaaa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>📜 سجل التحويلات</h2>
+        <div id="list"></div>
+        <a href="dashboard.html" class="nav-btn">🏠 العودة</a>
+    </div>
+    <script>
+        function formatMoney(fils) {
+            return (fils / 1000).toFixed(3) + ' دينار';
+        }
+        
+        function loadSession() {
+            const saved = localStorage.getItem('farmSession');
+            if (!saved) return null;
+            try { return JSON.parse(saved); } catch(e) { return null; }
+        }
+        
+        const session = loadSession();
+        if (!session) window.location.href = 'index.html';
+        
+        const transactions = localStorage.getItem('transfer_history');
+        const list = transactions ? JSON.parse(transactions) : [];
+        const filtered = list.filter(t => t.from === session.username || t.to === session.username);
+        
+        const container = document.getElementById('list');
+        if (filtered.length === 0) {
+            container.innerHTML = '<p>لا توجد تحويلات سابقة</p>';
+        } else {
+            filtered.forEach(t => {
+                const isSender = t.from === session.username;
+                const amountText = formatMoney(t.amount);
+                container.innerHTML += `
+                    <div class="transaction">
+                        <span>${isSender ? '📤 إلى' : '📥 من'} <strong>${isSender ? t.to : t.from}</strong></span>
+                        <span class="${isSender ? 'negative' : 'positive'}">${isSender ? '-' : '+'} ${amountText}</span>
+                        <span style="font-size:11px;">${new Date(t.date).toLocaleString()}</span>
+                    </div>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>
