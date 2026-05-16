@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>السوق المشترك - المزرعة الكبرى</title>
+    <title>السوق المشترك - منصة الألعاب</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: linear-gradient(145deg, #1e3c2c 0%, #2a5a3a 100%); font-family: system-ui, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
-        .market-container { max-width: 650px; width: 100%; background: #2e4a2e; border-radius: 35px; overflow: hidden; color: #f5f5dc; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
+        .market-container { max-width: 700px; width: 100%; background: #2e4a2e; border-radius: 35px; overflow: hidden; color: #f5f5dc; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
         .header { background: #1f3b1a; padding: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .gold { background: #ffcf4a; color: #1f3b1a; padding: 8px 16px; border-radius: 40px; font-weight: bold; }
         .nav-buttons { display: flex; gap: 10px; }
@@ -22,7 +22,6 @@
         hr { border-color: #4f7840; margin: 15px 0; }
         .message { background: #2a6b2a; padding: 10px; border-radius: 30px; text-align: center; margin-top: 15px; display: none; }
         .error-message { background: #8b3a3a; }
-        .logout-btn { background: #8b5a2b; color: white; }
         .empty-market { text-align: center; padding: 30px; color: #c5e0b4; }
         .loading { text-align: center; padding: 40px; font-size: 18px; }
     </style>
@@ -30,242 +29,70 @@
 <body>
     <div id="app">⏳ جاري التحميل...</div>
     <script>
-        // انتظار تحميل الصفحة
-        document.addEventListener('DOMContentLoaded', function() {
-            
-            const SUPABASE_URL = 'https://kzheikbpxicoeohapfjb.supabase.co';
-            const SUPABASE_ANON_KEY = 'sb_publishable_aVm9aZ6W5vYTVvTxo3hucw__uZ06aId';
-            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            
-            let session = null;
-            let player = null;
-            
-            function loadSession() {
-                const saved = localStorage.getItem('farmSession');
-                if (!saved) {
-                    window.location.href = 'index.html';
-                    return null;
-                }
-                try {
-                    const data = JSON.parse(saved);
-                    if (Date.now() - data.loginTime > 86400000) {
-                        localStorage.removeItem('farmSession');
-                        window.location.href = 'index.html';
-                        return null;
-                    }
-                    return data;
-                } catch(e) {
-                    window.location.href = 'index.html';
-                    return null;
-                }
+        const SUPABASE_URL = 'https://kzheikbpxicoeohapfjb.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_aVm9aZ6W5vYTVvTxo3hucw__uZ06aId';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let session = null, player = null;
+        function loadSession() {
+            const saved = localStorage.getItem('farmSession');
+            if (!saved) { window.location.href = 'index.html'; return null; }
+            try {
+                const data = JSON.parse(saved);
+                if (Date.now() - data.loginTime > 86400000) { localStorage.removeItem('farmSession'); window.location.href = 'index.html'; return null; }
+                return data;
+            } catch(e) { window.location.href = 'index.html'; return null; }
+        }
+        function loadGame() {
+            const saved = localStorage.getItem('farmGame_' + session.userId);
+            if (saved) { try { const data = JSON.parse(saved); player = data; if (!player.inventory) player.inventory = {}; if (!player.gold) player.gold = 100; } catch(e) {} }
+            if (!player) player = { gold: 100, score: 0, inventory: { Wheat: 3, Carrot: 2 }, fields: [], animals: [] };
+        }
+        function saveGame() { localStorage.setItem('farmGame_' + session.userId, JSON.stringify({ gold: player.gold, score: player.score, fields: player.fields||[], animals: player.animals||[], inventory: player.inventory })); }
+        function showMessage(msg, isError = false) {
+            const msgDiv = document.getElementById('message');
+            if(msgDiv) { msgDiv.innerHTML = msg; msgDiv.className = isError ? 'message error-message' : 'message'; msgDiv.style.display = 'block'; setTimeout(() => { msgDiv.style.display = 'none'; }, 3000); }
+        }
+        async function loadMarketListings() {
+            try { const { data, error } = await supabase.from('market_listings').select('*, seller:profiles(username)').eq('status', 'active').order('listed_at', { ascending: false }); if (error) return []; return data || []; } catch(e) { return []; }
+        }
+        async function createListing(item, qty, price) {
+            if (!player.inventory[item] || player.inventory[item] < qty) { showMessage(`⚠️ لا تملك ${qty} من ${item}`, true); return false; }
+            player.inventory[item] -= qty; saveGame();
+            const { error } = await supabase.from('market_listings').insert({ seller_id: session.userId, item_name: item, quantity: qty, price_per_unit: price });
+            if (error) { showMessage(`خطأ: ${error.message}`, true); return false; }
+            showMessage(`✅ تم نشر ${qty} ${item} للبيع`); return true;
+        }
+        async function buyListing(listingId, pricePerUnit, qty, itemName, sellerId) {
+            const total = pricePerUnit * qty;
+            if (player.gold < total) { showMessage(`⚠️ تحتاج ${total} ذهب`, true); return; }
+            player.gold -= total; player.inventory[itemName] = (player.inventory[itemName] || 0) + qty; saveGame();
+            if (!session.isGuest && sellerId !== session.userId) {
+                try { const { data: seller } = await supabase.from('profiles').select('gold').eq('id', sellerId).single(); if (seller) await supabase.from('profiles').update({ gold: seller.gold + total }).eq('id', sellerId); } catch(e) {}
             }
-            
-            function loadGame() {
-                const saved = localStorage.getItem('farmGame_' + session.userId);
-                if (saved) {
-                    try {
-                        const data = JSON.parse(saved);
-                        player = data;
-                        if (!player.inventory) player.inventory = {};
-                        if (!player.gold) player.gold = 100;
-                    } catch(e) {}
-                }
-                if (!player) {
-                    player = { gold: 100, score: 0, inventory: { Wheat: 3, Tomato: 2 }, fields: [], animals: [] };
-                }
-            }
-            
-            function saveGame() {
-                const gameData = {
-                    gold: player.gold,
-                    score: player.score || 0,
-                    fields: player.fields || [],
-                    animals: player.animals || [],
-                    inventory: player.inventory
-                };
-                localStorage.setItem('farmGame_' + session.userId, JSON.stringify(gameData));
-            }
-            
-            function showMessage(msg, isError = false) {
-                const msgDiv = document.getElementById('message');
-                if (msgDiv) {
-                    msgDiv.innerHTML = msg;
-                    msgDiv.className = isError ? 'message error-message' : 'message';
-                    msgDiv.style.display = 'block';
-                    setTimeout(() => { msgDiv.style.display = 'none'; }, 3000);
-                }
-            }
-            
-            async function loadMarketListings() {
-                try {
-                    const { data, error } = await supabase
-                        .from('market_listings')
-                        .select('*, seller:profiles(username)')
-                        .eq('status', 'active')
-                        .order('listed_at', { ascending: false });
-                    if (error) {
-                        console.error('Error loading listings:', error);
-                        return [];
-                    }
-                    return data || [];
-                } catch(e) {
-                    console.error('Exception loading listings:', e);
-                    return [];
-                }
-            }
-            
-            async function createListing(item, qty, price) {
-                if (!player.inventory[item] || player.inventory[item] < qty) {
-                    showMessage(`⚠️ لا تملك ${qty} من ${item}`, true);
-                    return false;
-                }
-                
-                player.inventory[item] -= qty;
-                saveGame();
-                
-                try {
-                    const { error } = await supabase.from('market_listings').insert({
-                        seller_id: session.userId,
-                        item_name: item,
-                        quantity: qty,
-                        price_per_unit: price
-                    });
-                    
-                    if (error) {
-                        showMessage(`خطأ: ${error.message}`, true);
-                        return false;
-                    }
-                    
-                    showMessage(`✅ تم نشر ${qty} ${item} للبيع`);
-                    return true;
-                } catch(e) {
-                    showMessage(`خطأ: ${e.message}`, true);
-                    return false;
-                }
-            }
-            
-            async function buyListing(listingId, pricePerUnit, qty, itemName, sellerId) {
-                const total = pricePerUnit * qty;
-                if (player.gold < total) {
-                    showMessage(`⚠️ تحتاج ${total} ذهب`, true);
-                    return;
-                }
-                
-                // شراء المنتج
-                player.gold -= total;
-                player.inventory[itemName] = (player.inventory[itemName] || 0) + qty;
-                saveGame();
-                
-                // تحديث البائع (إذا كان لاعب حقيقي وليس زائر)
-                if (!session.isGuest && sellerId !== session.userId) {
-                    try {
-                        const { data: seller } = await supabase.from('profiles').select('gold').eq('id', sellerId).single();
-                        if (seller) {
-                            await supabase.from('profiles').update({ gold: seller.gold + total }).eq('id', sellerId);
-                        }
-                    } catch(e) {
-                        console.error('Error updating seller:', e);
-                    }
-                }
-                
-                // حذف الإعلان
-                try {
-                    await supabase.from('market_listings').update({ status: 'sold' }).eq('id', listingId);
-                } catch(e) {
-                    console.error('Error updating listing:', e);
-                }
-                
-                showMessage(`🛒 اشتريت ${qty} ${itemName} بـ ${total} ذهب`);
-                renderMarket();
-            }
-            
-            function logout() {
-                localStorage.removeItem('farmSession');
-                window.location.href = 'index.html';
-            }
-            
-            async function renderMarket() {
-                // عرض حالة التحميل
-                document.getElementById('app').innerHTML = '<div class="market-container"><div class="loading">⏳ جاري تحميل السوق...</div></div>';
-                
-                const listings = await loadMarketListings();
-                
-                let marketHtml = '';
-                if (listings.length === 0) {
-                    marketHtml = '<div class="empty-market">🛒 لا توجد إعلانات. كن أول من ينشر! 🛒</div>';
-                } else {
-                    for (let l of listings) {
-                        marketHtml += `
-                            <div class="listing-card">
-                                <span style="font-size:18px;">📦 ${l.item_name}</span>
-                                <span>✖️ ${l.quantity}</span>
-                                <span>💰 ${l.price_per_unit} ذهب</span>
-                                <span>👤 ${l.seller?.username || 'بائع'}</span>
-                                <button onclick="window.buyListing('${l.id}', ${l.price_per_unit}, ${l.quantity}, '${l.item_name}', '${l.seller_id}')">🛒 شراء</button>
-                            </div>
-                        `;
-                    }
-                }
-                
-                // خيارات المنتجات من مخزون اللاعب
-                let itemOptions = '<option value="">-- اختر منتج --</option>';
-                for (let [item, qty] of Object.entries(player.inventory || {})) {
-                    if (qty > 0) {
-                        itemOptions += `<option value="${item}">${item} (${qty})</option>`;
-                    }
-                }
-                
-                document.getElementById('app').innerHTML = `
-                    <div class="market-container">
-                        <div class="header">
-                            <div class="gold">💰 ${player.gold || 0} ذهب</div>
-                            <div>👤 ${session.username}</div>
-                            <div class="nav-buttons">
-                                <a href="farm.html" class="nav-btn">🌾 المزرعة</a>
-                                <button class="logout-btn" id="logoutBtn">🚪 خروج</button>
-                            </div>
-                        </div>
-                        <div class="content">
-                            <h2>🛒 السوق المشترك</h2>
-                            <div id="marketListings">${marketHtml}</div>
-                            
-                            <div class="create-listing">
-                                <h3>➕ نشر إعلان جديد</h3>
-                                <select id="itemSelect">${itemOptions}</select>
-                                <input type="number" id="qtyInput" placeholder="الكمية" min="1">
-                                <input type="number" id="priceInput" placeholder="السعر لكل وحدة" min="1">
-                                <button id="publishBtn">📢 نشر للبيع</button>
-                            </div>
-                            
-                            <div id="message" class="message"></div>
-                        </div>
-                    </div>
-                `;
-                
-                document.getElementById('publishBtn').onclick = async function() {
-                    const item = document.getElementById('itemSelect').value;
-                    const qty = parseInt(document.getElementById('qtyInput').value);
-                    const price = parseInt(document.getElementById('priceInput').value);
-                    if (!item || !qty || !price) {
-                        showMessage('⚠️ املأ جميع الحقول', true);
-                        return;
-                    }
-                    await createListing(item, qty, price);
-                    renderMarket();
-                };
-                
-                document.getElementById('logoutBtn').onclick = logout;
-            }
-            
-            // بدء التشغيل
-            session = loadSession();
-            if (session) {
-                loadGame();
-                renderMarket();
-            }
-            
-            window.buyListing = buyListing;
-        });
+            await supabase.from('market_listings').update({ status: 'sold' }).eq('id', listingId);
+            showMessage(`🛒 اشتريت ${qty} ${itemName} بـ ${total} ذهب`);
+            renderMarket();
+        }
+        function logoutToDashboard() { window.location.href = 'dashboard.html'; }
+        async function renderMarket() {
+            document.getElementById('app').innerHTML = '<div class="market-container"><div class="loading">⏳ جاري تحميل السوق...</div></div>';
+            const listings = await loadMarketListings();
+            let marketHtml = '';
+            if (listings.length === 0) marketHtml = '<div class="empty-market">🛒 لا توجد إعلانات. كن أول من ينشر! 🛒</div>';
+            else for (let l of listings) marketHtml += `<div class="listing-card"><span style="font-size:18px;">📦 ${l.item_name}</span><span>✖️ ${l.quantity}</span><span>💰 ${l.price_per_unit} ذهب</span><span>👤 ${l.seller?.username || 'بائع'}</span><button onclick="window.buyListing('${l.id}', ${l.price_per_unit}, ${l.quantity}, '${l.item_name}', '${l.seller_id}')">🛒 شراء</button></div>`;
+            let itemOptions = '<option value="">-- اختر منتج --</option>';
+            for (let [item, qty] of Object.entries(player.inventory || {})) if (qty > 0) itemOptions += `<option value="${item}">${item} (${qty})</option>`;
+            document.getElementById('app').innerHTML = `
+                <div class="market-container">
+                    <div class="header"><div class="gold">💰 ${player.gold || 0} ذهب</div><div>👤 ${session.username}</div><div class="nav-buttons"><button class="nav-btn" id="dashboardBtn">🏠 القائمة الرئيسية</button></div></div>
+                    <div class="content"><h2>🛒 السوق المشترك</h2><div id="marketListings">${marketHtml}</div><div class="create-listing"><h3>➕ نشر إعلان جديد</h3><select id="itemSelect">${itemOptions}</select><input type="number" id="qtyInput" placeholder="الكمية" min="1"><input type="number" id="priceInput" placeholder="السعر لكل وحدة" min="1"><button id="publishBtn">📢 نشر للبيع</button></div><div id="message" class="message"></div></div>
+                </div>`;
+            document.getElementById('publishBtn').onclick = async () => { const item = document.getElementById('itemSelect').value; const qty = parseInt(document.getElementById('qtyInput').value); const price = parseInt(document.getElementById('priceInput').value); if (!item || !qty || !price) { showMessage('⚠️ املأ جميع الحقول', true); return; } await createListing(item, qty, price); renderMarket(); };
+            document.getElementById('dashboardBtn').onclick = logoutToDashboard;
+        }
+        session = loadSession();
+        if (session) { loadGame(); renderMarket(); }
+        window.buyListing = buyListing;
     </script>
 </body>
 </html>
