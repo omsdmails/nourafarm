@@ -275,5 +275,36 @@
             setInterval(() => renderDelivery(), 1000);
         }
     </script>
+    function acceptShipment(shipmentId, truckIndex) {
+    const truck = trucks[truckIndex];
+    if (truck.status !== 'available') { showMessage(`⚠️ الشاحنة مشغولة`, true); return; }
+    
+    // حساب المسافة والوقود اللازم
+    const driverLoc = getPlayerLocation(session.username);
+    const distance = getDistance(driverLoc.lat, driverLoc.lon, shipment.from_location.lat, shipment.from_location.lon);
+    const fuelNeeded = Math.ceil(distance / 10); // كل 10 كيلومتر تستهلك 1% وقود
+    if (truck.fuel < fuelNeeded) {
+        showMessage(`⚠️ الوقود غير كافٍ! تحتاج ${fuelNeeded}% وقود، لديك ${truck.fuel}%. توجه لمحطة وقود.`, true);
+        return;
+    }
+    
+    // استهلاك الوقود
+    truck.fuel -= fuelNeeded;
+    
+    // حساب وقت التوصيل الأساسي (كل 10 كم = ثانية واحدة)
+    let travelTimeSec = Math.max(10, distance / 10);
+    // تأثير الوقود: إذا كان الوقود منخفضاً، السرعة تقل
+    if (truck.fuel < 20) travelTimeSec *= 1.5;
+    // تأثير الموثوقية: فرصة عشوائية للتعطل (للتجربة سنضيفها لاحقاً)
+    
+    // تحديث حالة الشاحنة
+    truck.status = 'busy';
+    truck.missionEndTime = Date.now() + travelTimeSec * 1000;
+    truck.assignedShipmentId = shipmentId;
+    saveTrucks();
+    
+    // تحديث الطلب
+    // ... (باقي الكود كما هو)
+}
 </body>
 </html>
