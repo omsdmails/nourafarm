@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>اقتراح لعبة جديدة | منصة الألعاب</title>
+    <title>اقتراح لعبة جديدة - منصة الألعاب</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: linear-gradient(135deg, #1e3c2c 0%, #2a5a3a 100%); font-family: system-ui, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
@@ -36,18 +36,15 @@
         <div id="msg"></div>
     </div>
     <script>
-        document.getElementById('sendBtn').onclick = () => {
-            const name = document.getElementById('playerName').value.trim();
-            const type = document.getElementById('gameType').value;
-            const idea = document.getElementById('idea').value.trim();
-            if (!idea) {
-                document.getElementById('msg').innerHTML = '<div style="color:#ffaaaa;">⚠️ يرجى كتابة فكرتك</div>';
-                return;
-            }
-            const subject = `اقتراح لعبة جديدة - ${type}`;
-            const body = `الاسم: ${name || 'لاعب مجهول'}\nنوع اللعبة: ${type}\n\nالفكرة:\n${idea}`;
-            window.location.href = `mailto:omsdmails@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-            document.getElementById('msg').innerHTML = '<div style="color:#aaffaa;">✅ سيتم فتح بريدك. أرسل الرسالة لتصلنا فكرتك.</div>';
+        document.getElementById('sendBtn').onclick=()=>{
+            const name=document.getElementById('playerName').value.trim();
+            const type=document.getElementById('gameType').value;
+            const idea=document.getElementById('idea').value.trim();
+            if(!idea){ document.getElementById('msg').innerHTML='<div style="color:#ffaaaa;">⚠️ يرجى كتابة فكرتك</div>'; return; }
+            const subject=`اقتراح لعبة جديدة - ${type}`;
+            const body=`الاسم: ${name||'لاعب مجهول'}\nنوع اللعبة: ${type}\n\nالفكرة:\n${idea}`;
+            window.location.href=`mailto:omsdmails@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            document.getElementById('msg').innerHTML='<div style="color:#aaffaa;">✅ سيتم فتح بريدك. أرسل الرسالة لتصلنا فكرتك.</div>';
         };
     </script>
 </body>
