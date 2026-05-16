@@ -16,7 +16,7 @@
             padding: 20px;
         }
         .dashboard {
-            max-width: 700px;
+            max-width: 800px;
             width: 100%;
             background: #2e4a2e;
             border-radius: 40px;
@@ -26,7 +26,35 @@
             color: white;
         }
         h1 { color: #ffcf4a; margin-bottom: 10px; }
-        .subtitle { color: #c5e0b4; margin-bottom: 30px; }
+        .subtitle { color: #c5e0b4; margin-bottom: 20px; }
+        .ad-section {
+            background: #1f3b1a;
+            border-radius: 40px;
+            padding: 15px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .ad-section .gold-display {
+            background: #ffcf4a;
+            color: #1f3b1a;
+            padding: 8px 16px;
+            border-radius: 40px;
+            font-weight: bold;
+        }
+        .ad-btn {
+            background: #ffcf4a;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .ad-btn:active { transform: scale(0.97); }
         .games-grid {
             display: flex;
             flex-wrap: wrap;
@@ -63,13 +91,15 @@
             background: #1f3b1a;
             border-radius: 30px;
             padding: 15px;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
+            gap: 10px;
         }
         hr { border-color: #4f7840; margin: 15px 0; }
+        .msg { margin-top: 8px; font-size: 13px; color: #aaffaa; }
     </style>
 </head>
 <body>
@@ -77,12 +107,20 @@
         <h1>🎮 منصة الألعاب</h1>
         <div class="subtitle">اختر لعبتك المفضلة</div>
         <div class="user-info" id="userInfo"></div>
-        <div class="games-grid">
+        
+        <!-- قسم الإعلان والرصيد -->
+        <div class="ad-section">
+            <div class="gold-display" id="goldAmount">💰 0 ذهب</div>
+            <button class="ad-btn" id="watchAdBtn">📺 مشاهدة إعلان (احصل على 50 ذهب)</button>
+            <div id="adMsg" class="msg"></div>
+        </div>
+
+        <div class="games-grid" id="gamesGrid">
             <div class="game-card" onclick="window.location.href='location.html'">
-    <div class="emoji">📍</div>
-    <h3>تحديد موقعي</h3>
-    <p>لتوزيع عادل للنقل</p>
-</div>
+                <div class="emoji">📍</div>
+                <h3>تحديد موقعي</h3>
+                <p>لتوزيع عادل للنقل</p>
+            </div>
             <div class="game-card" onclick="window.location.href='farm.html'">
                 <div class="emoji">🌾</div>
                 <h3>المزرعة</h3>
@@ -98,46 +136,103 @@
                 <h3>المطعم</h3>
                 <p>طهي وجبات وبيعها بربح أعلى</p>
             </div>
+            <div class="game-card" onclick="window.location.href='factory.html'">
+                <div class="emoji">🏭</div>
+                <h3>المصنع</h3>
+                <p>تحويل المواد الخام</p>
+            </div>
+            <div class="game-card" onclick="window.location.href='map.html'">
+                <div class="emoji">🗺️</div>
+                <h3>محطات الخدمة</h3>
+                <p>وقود، غسيل، صيانة</p>
+            </div>
+            <div class="game-card" onclick="window.location.href='delivery.html'">
+                <div class="emoji">🚚</div>
+                <h3>النقل والتوصيل</h3>
+                <p>نقل البضائع عبر الشاحنات</p>
+            </div>
+            <div class="game-card" onclick="window.location.href='store.html'">
+                <div class="emoji">🏪</div>
+                <h3>المتجر المركزي</h3>
+                <p>شراء بذور وحيوانات</p>
+            </div>
+            <div class="game-card" onclick="window.location.href='suggest.html'">
+                <div class="emoji">💡</div>
+                <h3>اقتراح لعبة</h3>
+                <p>أرسل فكرتك</p>
+            </div>
         </div>
+
         <button class="logout-btn" id="logoutBtn">🚪 تسجيل خروج</button>
     </div>
     <script>
+        // دالة تحديث عرض الذهب
+        function updateGoldDisplay() {
+            const session = loadSession();
+            if (!session) return;
+            const key = session.isGuest ? 'guestGame' : 'game_' + session.username;
+            const data = localStorage.getItem(key);
+            if (data) {
+                const player = JSON.parse(data);
+                const goldAmount = player.gold || 0;
+                document.getElementById('goldAmount').innerHTML = `💰 ${goldAmount} ذهب`;
+            } else {
+                document.getElementById('goldAmount').innerHTML = '💰 0 ذهب';
+            }
+        }
+
+        // إضافة 50 ذهب بعد مشاهدة الإعلان (محاكاة)
+        function addGoldFromAd() {
+            const session = loadSession();
+            if (!session) {
+                document.getElementById('adMsg').innerHTML = '<span style="color:#ffaaaa;">⚠️ يرجى تسجيل الدخول أولاً</span>';
+                setTimeout(() => document.getElementById('adMsg').innerHTML = '', 2000);
+                return;
+            }
+            const key = session.isGuest ? 'guestGame' : 'game_' + session.username;
+            let player = localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key)) : { gold: 0, inventory: {} };
+            player.gold = (player.gold || 0) + 50;
+            localStorage.setItem(key, JSON.stringify(player));
+            updateGoldDisplay();
+            document.getElementById('adMsg').innerHTML = '<span style="color:#aaffaa;">✅ تمت إضافة 50 ذهب!</span>';
+            setTimeout(() => document.getElementById('adMsg').innerHTML = '', 2500);
+        }
+
         function loadSession() {
             const saved = localStorage.getItem('farmSession');
-            if (!saved) { window.location.href = 'index.html'; return null; }
+            if (!saved) return null;
             try {
                 const data = JSON.parse(saved);
                 if (Date.now() - data.loginTime > 86400000) {
                     localStorage.removeItem('farmSession');
-                    window.location.href = 'index.html';
                     return null;
                 }
                 return data;
-            } catch(e) { window.location.href = 'index.html'; return null; }
+            } catch(e) {
+                return null;
+            }
         }
+
         const session = loadSession();
         if (session) {
             document.getElementById('userInfo').innerHTML = `
                 <span>👤 ${session.username}</span>
                 <span>🆔 ${session.isGuest ? 'زائر' : 'مسجل'}</span>
-                <button id="refreshBtn" style="background:#3b5e2b; padding:5px 12px;">🔄 تحديث</button>
+                <button id="refreshBtn" style="background:#3b5e2b; padding:5px 12px; border-radius:30px;">🔄 تحديث</button>
             `;
             document.getElementById('refreshBtn').onclick = () => location.reload();
+            updateGoldDisplay();
+        } else {
+            // إذا لم توجد جلسة، نعرض رسالة ونعيد التوجيه لتسجيل الدخول بعد لحظة
+            document.getElementById('userInfo').innerHTML = '<span>⚠️ لم يتم تسجيل الدخول</span>';
+            setTimeout(() => { window.location.href = 'index.html'; }, 2000);
         }
+
         document.getElementById('logoutBtn').onclick = () => {
             localStorage.removeItem('farmSession');
             window.location.href = 'index.html';
         };
+        document.getElementById('watchAdBtn').onclick = addGoldFromAd;
     </script>
-    <div class="game-card" onclick="window.location.href='factory.html'">
-    <div class="emoji">🏭</div>
-    <h3>المصنع</h3>
-    <p>تحويل المواد الخام</p>
-</div>
-    <div class="game-card" onclick="window.location.href='map.html'">
-    <div class="emoji">🗺️</div>
-    <h3>محطات الخدمة</h3>
-    <p>وقود، غسيل، صيانة</p>
-</div>
 </body>
 </html>
