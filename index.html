@@ -1,26 +1,226 @@
 <!DOCTYPE html>
-<html>
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>المزرعة</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>تسجيل الدخول - المزرعة</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { background: #1e3c2c; font-family: Arial; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .box { background: #2e4a2e; padding: 30px; border-radius: 20px; color: white; text-align: center; }
-        button { background: #ffcf4a; padding: 10px 20px; border: none; border-radius: 20px; cursor: pointer; font-size: 16px; margin: 5px; }
-        input { padding: 10px; margin: 5px; border-radius: 20px; border: none; width: 90%; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #1e3c2c 0%, #2a5a3a 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .login-container {
+            max-width: 400px;
+            width: 100%;
+            background: #2e4a2e;
+            border-radius: 40px;
+            padding: 40px 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        h1 {
+            color: #ffcf4a;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #c5e0b4;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        input {
+            width: 100%;
+            padding: 14px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 30px;
+            font-size: 16px;
+            background: #f5f5dc;
+            text-align: right;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            margin: 8px 0;
+            border: none;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        button:active { transform: scale(0.98); }
+        .btn-login { background: #ffcf4a; color: #1f3b1a; }
+        .btn-signup { background: #3b5e2b; color: white; }
+        .message {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 20px;
+            font-size: 13px;
+        }
+        .error { background: #8b3a3a; color: #ffc0c0; }
+        .success { background: #2a6b2a; color: #c0ffc0; }
+        .info { background: #4a7c3a; color: #f5f5dc; }
+        hr { border-color: #4f7840; margin: 20px 0; }
+        .guest-btn { background: #7c5e3a; color: #f5f5dc; margin-top: 5px; }
     </style>
 </head>
 <body>
-    <div id="app"></div>
+    <div class="login-container" id="app">
+        <h1>🌾 المزرعة الكبرى</h1>
+        <div class="subtitle">سوق مشترك | حيوانات | محاصيل</div>
+        
+        <input type="email" id="email" placeholder="البريد الإلكتروني">
+        <input type="password" id="password" placeholder="كلمة المرور (6+ أحرف)">
+        
+        <button class="btn-login" id="loginBtn">🔓 تسجيل دخول</button>
+        <button class="btn-signup" id="signupBtn">📝 إنشاء حساب جديد</button>
+        
+        <hr>
+        
+        <button class="guest-btn" id="guestBtn">👤 لعب كزائر (بدون حفظ)</button>
+        
+        <div id="message"></div>
+    </div>
+
     <script>
-        // عرض شاشة بسيطة بدون Supabase أولاً
-        document.getElementById('app').innerHTML = `
-            <div class="box">
-                <h1>🌾 المزرعة</h1>
-                <p>إذا رأيت هذا النص، فالمشكلة ليست في الكود</p>
-                <button onclick="alert('الزر يعمل!')">اضغط هنا للاختبار</button>
-            </div>
-        `;
+        const SUPABASE_URL = 'https://kzheikbpxicoeohapfjb.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_aVm9aZ6W5vYTVvTxo3hucw__uZ06aId';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        function showMessage(msg, type) {
+            const msgDiv = document.getElementById('message');
+            msgDiv.innerHTML = `<div class="message ${type}">${msg}</div>`;
+            setTimeout(() => { msgDiv.innerHTML = ''; }, 4000);
+        }
+        
+        // حفظ بيانات الدخول مؤقتاً
+        function saveUserSession(userId, username, isGuest = false) {
+            const session = { userId, username, isGuest, loginTime: Date.now() };
+            localStorage.setItem('farmSession', JSON.stringify(session));
+        }
+        
+        // إنشاء لاعب جديد في قاعدة البيانات
+        async function createNewPlayer(userId, username) {
+            const newPlayer = {
+                id: userId,
+                username: username,
+                gold: 100,
+                score: 0,
+                inventory: { Wheat: 3, Tomato: 2, Carrot: 1 },
+                fields: [null, null, null, null],
+                animals: []
+            };
+            
+            const { error } = await supabase.from('profiles').insert(newPlayer);
+            if (error) console.error('Error creating player:', error);
+            return newPlayer;
+        }
+        
+        // تسجيل الدخول
+        async function login(email, password) {
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) {
+                showMessage(error.message, 'error');
+                return false;
+            }
+            
+            // التحقق من وجود ملف اللاعب
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', data.user.id)
+                .single();
+            
+            if (profileError && profileError.code === 'PGRST116') {
+                // لاعب جديد - إنشاء ملف
+                await createNewPlayer(data.user.id, email.split('@')[0]);
+            }
+            
+            saveUserSession(data.user.id, email.split('@')[0], false);
+            showMessage('✅ تم تسجيل الدخول بنجاح! جاري التحويل...', 'success');
+            setTimeout(() => { window.location.href = 'farm.html'; }, 1000);
+            return true;
+        }
+        
+        // تسجيل حساب جديد
+        async function signup(email, password) {
+            if (password.length < 6) {
+                showMessage('كلمة المرور قصيرة جداً (6 أحرف على الأقل)', 'error');
+                return false;
+            }
+            
+            const { data, error } = await supabase.auth.signUp({ email, password });
+            if (error) {
+                showMessage(error.message, 'error');
+                return false;
+            }
+            
+            showMessage('✅ تم إنشاء الحساب! يرجى تأكيد بريدك الإلكتروني ثم تسجيل الدخول.', 'success');
+            return true;
+        }
+        
+        // وضع الزائر (بدون حساب)
+        function guestMode() {
+            const guestId = 'guest_' + Date.now();
+            const guestName = 'زائر_' + Math.floor(Math.random() * 1000);
+            saveUserSession(guestId, guestName, true);
+            showMessage('✅ مرحباً بك كزائر! البيانات لن تحفظ.', 'success');
+            setTimeout(() => { window.location.href = 'farm.html'; }, 1000);
+        }
+        
+        // التحقق من جلسة حالية
+        async function checkExistingSession() {
+            const session = localStorage.getItem('farmSession');
+            if (session) {
+                try {
+                    const { userId, isGuest } = JSON.parse(session);
+                    if (userId && !isGuest) {
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (user && user.id === userId) {
+                            window.location.href = 'farm.html';
+                            return;
+                        }
+                    } else if (userId && isGuest) {
+                        window.location.href = 'farm.html';
+                        return;
+                    }
+                } catch(e) {}
+            }
+            localStorage.removeItem('farmSession');
+        }
+        
+        // ربط الأزرار
+        document.getElementById('loginBtn').onclick = () => {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            if (!email || !password) {
+                showMessage('يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
+                return;
+            }
+            login(email, password);
+        };
+        
+        document.getElementById('signupBtn').onclick = () => {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            if (!email || !password) {
+                showMessage('يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
+                return;
+            }
+            signup(email, password);
+        };
+        
+        document.getElementById('guestBtn').onclick = () => guestMode();
+        
+        checkExistingSession();
     </script>
 </body>
 </html>
