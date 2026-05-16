@@ -6,24 +6,8 @@
     <title>تسجيل الدخول - منصة الألعاب</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: linear-gradient(135deg, #1e3c2c 0%, #2a5a3a 100%);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .login-container {
-            max-width: 400px;
-            width: 100%;
-            background: #2e4a2e;
-            border-radius: 40px;
-            padding: 40px 30px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-            text-align: center;
-        }
+        body { background: linear-gradient(135deg, #1e3c2c 0%, #2a5a3a 100%); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        .login-container { max-width: 400px; width: 100%; background: #2e4a2e; border-radius: 40px; padding: 40px 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); text-align: center; }
         h1 { color: #ffcf4a; font-size: 32px; margin-bottom: 10px; }
         .subtitle { color: #c5e0b4; margin-bottom: 30px; font-size: 14px; }
         input { width: 100%; padding: 14px; margin: 10px 0; border: none; border-radius: 30px; font-size: 16px; background: #f5f5dc; text-align: right; }
@@ -41,118 +25,68 @@
 <body>
     <div class="login-container" id="app">
         <h1>🌾 منصة الألعاب</h1>
-        <div class="subtitle">مزرعة | سوق | مطعم</div>
+        <div class="subtitle">مزرعة | سوق | مطعم | مصنع | نقل</div>
         <input type="text" id="username" placeholder="اسم المستخدم">
         <input type="password" id="password" placeholder="كلمة المرور">
         <button class="btn-login" id="loginBtn">🔓 تسجيل دخول</button>
         <button class="btn-signup" id="signupBtn">📝 إنشاء حساب جديد</button>
         <hr>
-        <button class="guest-btn" id="guestBtn">👤 لعب كزائر</button>
+        <button class="guest-btn" id="guestBtn">👤 لعب كزائر (بدون حفظ)</button>
         <div id="message"></div>
     </div>
     <script>
-        // نظام تسجيل دخول داخلي (باستخدام localStorage فقط)
+        // نظام تسجيل دخول داخلي (بدون سيرفر)
+        function getUsers() { const users = localStorage.getItem('app_users'); return users ? JSON.parse(users) : {}; }
+        function saveUsers(users) { localStorage.setItem('app_users', JSON.stringify(users)); }
         
-        // الحصول على قائمة المستخدمين من localStorage
-        function getUsers() {
-            const users = localStorage.getItem('app_users');
-            return users ? JSON.parse(users) : {};
-        }
+        function formatMoney(fils) { return (fils / 1000).toFixed(3) + ' د.أ'; }
         
-        // حفظ قائمة المستخدمين
-        function saveUsers(users) {
-            localStorage.setItem('app_users', JSON.stringify(users));
-        }
-        
-        // تسجيل حساب جديد
         function signup() {
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
             const msgDiv = document.getElementById('message');
-            
-            if (!username || !password) {
-                msgDiv.innerHTML = '<div class="message error">يرجى إدخال اسم المستخدم وكلمة المرور</div>';
-                return;
-            }
-            if (password.length < 4) {
-                msgDiv.innerHTML = '<div class="message error">كلمة المرور قصيرة جداً (4 أحرف على الأقل)</div>';
-                return;
-            }
-            
+            if (!username || !password) { msgDiv.innerHTML = '<div class="message error">يرجى إدخال الاسم وكلمة المرور</div>'; return; }
+            if (password.length < 4) { msgDiv.innerHTML = '<div class="message error">كلمة المرور قصيرة جداً (4 أحرف على الأقل)</div>'; return; }
             const users = getUsers();
-            if (users[username]) {
-                msgDiv.innerHTML = '<div class="message error">اسم المستخدم موجود مسبقاً</div>';
-                return;
-            }
-            
-            // تخزين كلمة المرور (بتشفير بسيط Base64 للتجربة)
+            if (users[username]) { msgDiv.innerHTML = '<div class="message error">اسم المستخدم موجود مسبقاً</div>'; return; }
             users[username] = btoa(password);
             saveUsers(users);
-            
-            // إنشاء بيانات اللاعب الجديد
-            const defaultGameData = {
-                gold: 100,
-                score: 0,
-                inventory: { Wheat: 3, Tomato: 2, Carrot: 1 },
-                fields: [null, null, null, null],
-                animals: []
-            };
-            localStorage.setItem(`game_${username}`, JSON.stringify(defaultGameData));
-            
+            // إنشاء بيانات اللاعب الجديد (يبدأ بـ 0 ذهب، مخزون بسيط للتجربة)
+            const defaultGameData = { gold: 0, score: 0, inventory: { Wheat: 3, Carrot: 2 }, fields: [null,null,null,null], animals: [] };
+            localStorage.setItem('game_' + username, JSON.stringify(defaultGameData));
             msgDiv.innerHTML = '<div class="message success">✅ تم إنشاء الحساب! يمكنك تسجيل الدخول الآن</div>';
             document.getElementById('password').value = '';
         }
         
-        // تسجيل الدخول
         function login() {
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
             const msgDiv = document.getElementById('message');
-            
-            if (!username || !password) {
-                msgDiv.innerHTML = '<div class="message error">يرجى إدخال اسم المستخدم وكلمة المرور</div>';
-                return;
-            }
-            
+            if (!username || !password) { msgDiv.innerHTML = '<div class="message error">يرجى إدخال الاسم وكلمة المرور</div>'; return; }
             const users = getUsers();
-            if (!users[username]) {
-                msgDiv.innerHTML = '<div class="message error">اسم المستخدم غير موجود</div>';
-                return;
-            }
-            
-            if (atob(users[username]) !== password) {
-                msgDiv.innerHTML = '<div class="message error">كلمة المرور غير صحيحة</div>';
-                return;
-            }
-            
-            // حفظ جلسة المستخدم
-            const session = { username, loginTime: Date.now() };
+            if (!users[username]) { msgDiv.innerHTML = '<div class="message error">اسم المستخدم غير موجود</div>'; return; }
+            if (atob(users[username]) !== password) { msgDiv.innerHTML = '<div class="message error">كلمة المرور غير صحيحة</div>'; return; }
+            const session = { username, userId: username, isGuest: false, loginTime: Date.now() };
             localStorage.setItem('farmSession', JSON.stringify(session));
-            
             msgDiv.innerHTML = '<div class="message success">✅ تم تسجيل الدخول! جاري التحويل...</div>';
             setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
         }
         
-        // وضع الزائر
         function guestMode() {
             const guestId = 'guest_' + Date.now();
-            const session = { username: 'زائر', isGuest: true, guestId, loginTime: Date.now() };
+            const session = { username: 'زائر', userId: guestId, isGuest: true, loginTime: Date.now() };
             localStorage.setItem('farmSession', JSON.stringify(session));
             document.getElementById('message').innerHTML = '<div class="message success">✅ مرحباً بك كزائر! جاري التحويل...</div>';
             setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
         }
         
-        // التحقق من جلسة نشطة
         function checkSession() {
             const session = localStorage.getItem('farmSession');
             if (session) {
                 try {
                     const { loginTime } = JSON.parse(session);
-                    if (Date.now() - loginTime < 86400000) {
-                        window.location.href = 'dashboard.html';
-                    } else {
-                        localStorage.removeItem('farmSession');
-                    }
+                    if (Date.now() - loginTime < 86400000) { window.location.href = 'dashboard.html'; }
+                    else { localStorage.removeItem('farmSession'); }
                 } catch(e) {}
             }
         }
@@ -160,7 +94,6 @@
         document.getElementById('signupBtn').onclick = signup;
         document.getElementById('loginBtn').onclick = login;
         document.getElementById('guestBtn').onclick = guestMode;
-        
         checkSession();
     </script>
 </body>
