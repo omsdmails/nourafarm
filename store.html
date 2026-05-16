@@ -23,6 +23,40 @@
         .logout-btn { background: #8b5a2b; color: white; }
     </style>
 </head>
+    function buyItem(itemKey) {
+    const item = STORE_ITEMS[itemKey];
+    if (!item) return;
+    if (player.gold < item.price) {
+        showMessage(`⚠️ لا تملك ${item.price} ذهب`, true);
+        return;
+    }
+    player.gold -= item.price;
+    saveGame();
+    
+    // موقع المتجر المركزي ثابت
+    const storeLocation = { lat: 31.9474, lon: 35.9332 };
+    const buyerLocation = getPlayerLocation(session.username);
+    
+    const shipments = loadShipments();
+    const newShipment = {
+        id: Date.now(),
+        from: 'المتجر المركزي',
+        to: session.username,
+        from_location: storeLocation,
+        to_location: buyerLocation,
+        item: itemKey,
+        quantity: 1,
+        status: 'pending',
+        assigned_to: null,
+        assigned_at: null,
+        reward: Math.floor(item.price * 0.1)
+    };
+    shipments.push(newShipment);
+    saveShipments(shipments);
+    
+    showMessage(`✅ تم شراء ${item.emoji} ${item.name}. سيتم توصيله بواسطة لاعب نقل.`, false);
+    renderStore();
+}
 <body>
     <div id="app">⏳ جاري التحميل...</div>
     <script>
