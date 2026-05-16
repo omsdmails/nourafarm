@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>السوق المشترك | منصة الألعاب</title>
     <style>
-        /* نفس الأنماط السابقة */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: linear-gradient(145deg, #1e3c2c 0%, #2a5a3a 100%); font-family: system-ui, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
         .market-container { max-width: 800px; width: 100%; background: #2e4a2e; border-radius: 35px; overflow: hidden; color: #f5f5dc; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
@@ -28,66 +27,18 @@
         .empty-market { text-align: center; padding: 20px; color: #c5e0b4; }
     </style>
 </head>
-    // الدوال الجديدة (أضفها في script)
-function getPlayerLocation(username) {
-    if (username === 'المتجر المركزي') return { lat: 31.9474, lon: 35.9332 };
-    const key = 'location_' + username;
-    const saved = localStorage.getItem(key);
-    if (saved) return JSON.parse(saved);
-    return null;
-}
-
-// تعديل دالة buyListing لتصبح:
-async function buyListing(listingId, pricePerUnit, qty, itemName, sellerName) {
-    const total = pricePerUnit * qty;
-    if (player.gold < total) { showMessage(`⚠️ تحتاج ${total} ذهب`, true); return; }
-    if (sellerName === session.username) { showMessage(`⚠️ لا يمكنك شراء منتجك الخاص`, true); return; }
-    
-    // خصم الذهب من المشتري
-    player.gold -= total;
-    saveGame();
-    
-    // الحصول على مواقع البائع والمشتري
-    const sellerLocation = getPlayerLocation(sellerName);
-    const buyerLocation = getPlayerLocation(session.username);
-    
-    // إنشاء طلب نقل
-    const shipments = loadShipments();
-    const newShipment = {
-        id: Date.now(),
-        from: sellerName,
-        to: session.username,
-        from_location: sellerLocation,
-        to_location: buyerLocation,
-        item: itemName,
-        quantity: qty,
-        status: 'pending',
-        assigned_to: null,
-        assigned_at: null,
-        reward: Math.floor(total * 0.1) // 10%
-    };
-    shipments.push(newShipment);
-    saveShipments(shipments);
-    
-    // إزالة الإعلان من السوق
-    const listings = loadMarketListings();
-    const newListings = listings.filter(l => l.id !== listingId);
-    saveMarketListings(newListings);
-    
-    showMessage(`🛒 تم شراء ${qty} ${itemName}. سيتم توصيله بواسطة لاعب نقل (تحديد السعر حسب المسافة)`, false);
-    renderMarket();
-}
 <body>
     <div id="app">⏳ جاري التحميل...</div>
     <script>
         let session = null;
         let player = null;
         
+        // تصنيف المنتجات
         const categories = {
             'خضار': ['Wheat', 'Tomato', 'Carrot', 'Potato', 'Pepper', 'Cucumber', 'Onion', 'Corn'],
             'فواكه': ['Strawberry', 'Watermelon'],
             'حيواني': ['Egg', 'Milk', 'Wool'],
-            'مصنع': ['Bread', 'Pizza', 'Cake']
+            'مصنع': ['Flour', 'Oil', 'Bread', 'Juice']
         };
         
         function getItemCategory(item) {
@@ -108,13 +59,13 @@ async function buyListing(listingId, pricePerUnit, qty, itemName, sellerName) {
         function loadGame() {
             if (session.isGuest) {
                 const guestGame = localStorage.getItem('guestGame');
-                player = guestGame ? JSON.parse(guestGame) : { gold: 100, score: 0, inventory: { Wheat: 3, Carrot: 2 } };
+                player = guestGame ? JSON.parse(guestGame) : { gold: 0, score: 0, inventory: {} };
             } else {
                 const saved = localStorage.getItem('game_' + session.username);
-                player = saved ? JSON.parse(saved) : { gold: 100, score: 0, inventory: { Wheat: 3, Carrot: 2 }, fields: [], animals: [] };
+                player = saved ? JSON.parse(saved) : { gold: 0, score: 0, inventory: {} };
             }
             if (!player.inventory) player.inventory = {};
-            if (!player.gold) player.gold = 100;
+            if (!player.gold) player.gold = 0;
         }
         
         function saveGame() {
@@ -143,6 +94,24 @@ async function buyListing(listingId, pricePerUnit, qty, itemName, sellerName) {
             localStorage.setItem('globalMarketListings', JSON.stringify(listings));
         }
         
+        // دوال النقل (مشتركة)
+        function getPlayerLocation(username) {
+            if (username === 'المتجر المركزي') return { lat: 31.9474, lon: 35.9332 };
+            const key = 'location_' + username;
+            const saved = localStorage.getItem(key);
+            if (saved) return JSON.parse(saved);
+            return null;
+        }
+        
+        function loadShipments() {
+            const all = localStorage.getItem('globalShipments');
+            return all ? JSON.parse(all) : [];
+        }
+        
+        function saveShipments(shipments) {
+            localStorage.setItem('globalShipments', JSON.stringify(shipments));
+        }
+        
         async function createListing(item, qty, price) {
             if (!player.inventory[item] || player.inventory[item] < qty) {
                 showMessage(`⚠️ لا تملك ${qty} من ${item}`, true);
@@ -166,49 +135,40 @@ async function buyListing(listingId, pricePerUnit, qty, itemName, sellerName) {
             return true;
         }
         
-        // شراء من السوق -> لا تضيف للمخزون مباشرة، بل تنشئ طلب نقل
         async function buyListing(listingId, pricePerUnit, qty, itemName, sellerName) {
             const total = pricePerUnit * qty;
             if (player.gold < total) { showMessage(`⚠️ تحتاج ${total} ذهب`, true); return; }
             if (sellerName === session.username) { showMessage(`⚠️ لا يمكنك شراء منتجك الخاص`, true); return; }
             
-            // خصم الذهب من المشتري
             player.gold -= total;
             saveGame();
             
-            // إنشاء طلب نقل
+            const sellerLocation = getPlayerLocation(sellerName);
+            const buyerLocation = getPlayerLocation(session.username);
+            
             const shipments = loadShipments();
             const newShipment = {
                 id: Date.now(),
                 from: sellerName,
                 to: session.username,
+                from_location: sellerLocation,
+                to_location: buyerLocation,
                 item: itemName,
                 quantity: qty,
-                status: 'pending', // pending, in_transit, delivered
+                status: 'pending',
                 assigned_to: null,
                 assigned_at: null,
-                reward: Math.floor(total * 0.1) // أجرة النقل 10% من قيمة الطلب
+                reward: Math.floor(total * 0.1)
             };
             shipments.push(newShipment);
             saveShipments(shipments);
             
-            // إزالة الإعلان من السوق
             const listings = loadMarketListings();
             const newListings = listings.filter(l => l.id !== listingId);
             saveMarketListings(newListings);
             
-            showMessage(`🛒 تم شراء ${qty} ${itemName}. سيتم توصيله بواسطة لاعب نقل`, false);
+            showMessage(`🛒 تم شراء ${qty} ${itemName}. سيتم توصيله بواسطة لاعب نقل.`, false);
             renderMarket();
-        }
-        
-        // دوار طلبات النقل
-        function loadShipments() {
-            const all = localStorage.getItem('globalShipments');
-            return all ? JSON.parse(all) : [];
-        }
-        
-        function saveShipments(shipments) {
-            localStorage.setItem('globalShipments', JSON.stringify(shipments));
         }
         
         function logout() {
