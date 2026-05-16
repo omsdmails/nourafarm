@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>المزرعة - منصة الألعاب</title>
     <style>
+        /* نفس الأنماط السابقة مع تعديل بسيط */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: linear-gradient(145deg, #1e3c2c 0%, #2a5a3a 100%); font-family: system-ui, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
         .game-container { max-width: 750px; width: 100%; background: #2e4a2e; border-radius: 35px; overflow: hidden; color: #f5f5dc; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
@@ -38,13 +39,7 @@
 <body>
     <div id="app"></div>
     <script>
-        // دالة تحويل الفلس إلى دينار (1 دينار = 1000 فلس)
-        function formatMoney(fils) {
-            return (fils / 1000).toFixed(3) + ' د.أ';
-        }
-        
-        // الأسعار بالفلس (ضربنا الأسعار القديمة × 1000)
-        // مثال: قمح سعره 2 ذهب قديم = 2000 فلس = 2 دينار
+        function formatMoney(fils) { return (fils / 1000).toFixed(3) + ' د.أ'; }
         const CROPS = {
             Wheat: { name: "قمح", emoji: "🌾", buy: 2000, sell: 5000, growTime: 5, levelReq: 1 },
             Carrot: { name: "جزر", emoji: "🥕", buy: 1000, sell: 4000, growTime: 4, levelReq: 1 },
@@ -55,242 +50,52 @@
             Strawberry: { name: "فراولة", emoji: "🍓", buy: 5000, sell: 12000, growTime: 10, levelReq: 4 },
             Watermelon: { name: "بطيخ", emoji: "🍉", buy: 8000, sell: 20000, growTime: 12, levelReq: 5 }
         };
-        
         const ANIMALS = {
             Chicken: { name: "دجاجة", emoji: "🐔", product: "بيض", productEmoji: "🥚", price: 20000, interval: 10000, sellProduct: 3000 },
             Cow: { name: "بقرة", emoji: "🐄", product: "حليب", productEmoji: "🥛", price: 50000, interval: 20000, sellProduct: 8000 },
             Sheep: { name: "خروف", emoji: "🐑", product: "صوف", productEmoji: "🧶", price: 40000, interval: 15000, sellProduct: 6000 }
         };
-        
         let player = { gold: 0, score: 0, fields: [null,null,null,null], animals: [], inventory: { Wheat: 3, Carrot: 2 } };
         let activeTab = 'farm';
         let session = null;
-        
         function calculateLevel(score) { return Math.floor(score / 50) + 1; }
         function pointsToNextLevel(score) { return (calculateLevel(score) * 50) - score; }
         function levelProgress(score) { const lvl = calculateLevel(score); return ((score - ((lvl-1)*50)) / 50) * 100; }
         function isCropUnlocked(cropKey) { return calculateLevel(player.score) >= CROPS[cropKey].levelReq; }
-        
-        function loadSession() {
-            const saved = localStorage.getItem('farmSession');
-            if (!saved) { window.location.href = 'index.html'; return null; }
-            try {
-                const data = JSON.parse(saved);
-                if (Date.now() - data.loginTime > 86400000) {
-                    localStorage.removeItem('farmSession');
-                    window.location.href = 'index.html';
-                    return null;
-                }
-                return data;
-            } catch(e) { window.location.href = 'index.html'; return null; }
-        }
-        
-        function saveGame() {
-            localStorage.setItem('farmGame_' + session.userId, JSON.stringify({
-                gold: player.gold,
-                score: player.score,
-                fields: player.fields,
-                animals: player.animals,
-                inventory: player.inventory
-            }));
-        }
-        
-        function loadGame() {
-            const saved = localStorage.getItem('farmGame_' + session.userId);
-            if (saved) {
-                try {
-                    const data = JSON.parse(saved);
-                    player = { ...player, ...data };
-                    if (!player.fields) player.fields = [null,null,null,null];
-                    if (!player.animals) player.animals = [];
-                    if (!player.inventory) player.inventory = {};
-                } catch(e) {}
-            }
-        }
-        
-        function showMessage(msg) {
-            const msgDiv = document.getElementById('message');
-            if(msgDiv){ msgDiv.innerHTML = msg; msgDiv.style.display = 'block'; setTimeout(() => { msgDiv.style.display = 'none'; }, 2500); }
-        }
-        
-        function plantCrop(cropKey, fieldIndex) {
-            const crop = CROPS[cropKey];
-            if (!isCropUnlocked(cropKey)) { showMessage(`⚠️ تحتاج مستوى ${crop.levelReq} لزراعة ${crop.name}`); return; }
-            if (player.fields[fieldIndex]) { showMessage(`⚠️ الحقل مشغول!`); return; }
-            if (player.gold < crop.buy) { showMessage(`⚠️ تحتاج ${formatMoney(crop.buy)}`); return; }
-            player.gold -= crop.buy;
-            player.fields[fieldIndex] = { crop: cropKey, plantedAt: Date.now() };
-            saveGame(); renderGame(); showMessage(`🌱 زرعت ${crop.emoji} ${crop.name}!`);
-        }
-        
-        function harvestField(fieldIndex) {
-            const field = player.fields[fieldIndex];
-            if (!field) return;
-            const crop = CROPS[field.crop];
-            const elapsed = (Date.now() - field.plantedAt) / 1000;
-            if (elapsed < crop.growTime) { showMessage(`⚠️ يتبقى ${Math.ceil(crop.growTime - elapsed)} ثانية`); return; }
-            player.gold += crop.sell; player.score++;
-            player.inventory[field.crop] = (player.inventory[field.crop] || 0) + 1;
-            player.fields[fieldIndex] = null;
-            saveGame(); renderGame(); showMessage(`🌾 حصدت ${crop.emoji} ${crop.name}! +${formatMoney(crop.sell)}`);
-        }
-        
-        function harvestAll() {
-            for (let i = 0; i < 4; i++) {
-                const f = player.fields[i];
-                if (f) {
-                    const crop = CROPS[f.crop];
-                    if ((Date.now() - f.plantedAt)/1000 >= crop.growTime) {
-                        player.gold += crop.sell;
-                        player.score++;
-                        player.inventory[f.crop] = (player.inventory[f.crop] || 0) + 1;
-                        player.fields[i] = null;
-                    }
-                }
-            }
-            saveGame(); renderGame(); showMessage(`🌾 تم حصاد المحاصيل الجاهزة!`);
-        }
-        
-        function buyAnimal(animalKey) {
-            const animal = ANIMALS[animalKey];
-            if (player.gold < animal.price) { showMessage(`⚠️ تحتاج ${formatMoney(animal.price)}`); return; }
-            player.gold -= animal.price;
-            player.animals.push({ type: animalKey, lastCollect: Date.now() - animal.interval });
-            saveGame(); renderGame(); showMessage(`🐣 اشتريت ${animal.emoji} ${animal.name}!`);
-        }
-        
-        function collectAnimal(index) {
-            const a = player.animals[index];
-            const animal = ANIMALS[a.type];
-            const now = Date.now();
-            if (now - a.lastCollect >= animal.interval) {
-                player.inventory[animal.product] = (player.inventory[animal.product] || 0) + 1;
-                player.gold += animal.sellProduct; player.score++;
-                a.lastCollect = now;
-                saveGame(); renderGame(); showMessage(`🥚 جمعت ${animal.productEmoji} ${animal.product}! +${formatMoney(animal.sellProduct)}`);
-            } else {
-                showMessage(`⏳ ستنتج بعد ${Math.ceil((animal.interval - (now - a.lastCollect))/1000)} ثانية`);
-            }
-        }
-        
-        function logoutToDashboard() { window.location.href = 'dashboard.html'; }
-        
+        function loadSession() { const saved = localStorage.getItem('farmSession'); if(!saved){window.location.href='index.html';return null;} try { const data=JSON.parse(saved); if(Date.now()-data.loginTime>86400000){localStorage.removeItem('farmSession');window.location.href='index.html';return null;} return data; } catch(e){window.location.href='index.html';return null;} }
+        function saveGame() { localStorage.setItem('farmGame_' + session.userId, JSON.stringify({ gold: player.gold, score: player.score, fields: player.fields, animals: player.animals, inventory: player.inventory })); }
+        function loadGame() { const saved = localStorage.getItem('farmGame_' + session.userId); if(saved){ const data=JSON.parse(saved); player={...player,...data}; if(!player.fields) player.fields=[null,null,null,null]; if(!player.animals) player.animals=[]; if(!player.inventory) player.inventory={}; } }
+        function showMessage(msg) { const msgDiv=document.getElementById('message'); if(msgDiv){ msgDiv.innerHTML=msg; msgDiv.style.display='block'; setTimeout(()=>{msgDiv.style.display='none';},2500); } }
+        function plantCrop(cropKey,fieldIndex) { const crop=CROPS[cropKey]; if(!isCropUnlocked(cropKey)){showMessage(`⚠️ تحتاج مستوى ${crop.levelReq} لزراعة ${crop.name}`);return;} if(player.fields[fieldIndex]){showMessage(`⚠️ الحقل مشغول!`);return;} if(player.gold<crop.buy){showMessage(`⚠️ تحتاج ${formatMoney(crop.buy)}`);return;} player.gold-=crop.buy; player.fields[fieldIndex]={crop:cropKey,plantedAt:Date.now()}; saveGame(); renderGame(); showMessage(`🌱 زرعت ${crop.emoji} ${crop.name}!`); }
+        function harvestField(fieldIndex) { const field=player.fields[fieldIndex]; if(!field)return; const crop=CROPS[field.crop]; const elapsed=(Date.now()-field.plantedAt)/1000; if(elapsed<crop.growTime){showMessage(`⚠️ يتبقى ${Math.ceil(crop.growTime-elapsed)} ثانية`);return;} player.gold+=crop.sell; player.score++; player.inventory[field.crop]=(player.inventory[field.crop]||0)+1; player.fields[fieldIndex]=null; saveGame(); renderGame(); showMessage(`🌾 حصدت ${crop.emoji} ${crop.name}! +${formatMoney(crop.sell)}`); }
+        function harvestAll() { for(let i=0;i<4;i++){const f=player.fields[i]; if(f){const crop=CROPS[f.crop]; if((Date.now()-f.plantedAt)/1000>=crop.growTime){player.gold+=crop.sell; player.score++; player.inventory[f.crop]=(player.inventory[f.crop]||0)+1; player.fields[i]=null; }}} saveGame(); renderGame(); showMessage(`🌾 تم حصاد المحاصيل الجاهزة!`); }
+        function buyAnimal(animalKey) { const animal=ANIMALS[animalKey]; if(player.gold<animal.price){showMessage(`⚠️ تحتاج ${formatMoney(animal.price)}`);return;} player.gold-=animal.price; player.animals.push({type:animalKey,lastCollect:Date.now()-animal.interval}); saveGame(); renderGame(); showMessage(`🐣 اشتريت ${animal.emoji} ${animal.name}!`); }
+        function collectAnimal(index) { const a=player.animals[index]; const animal=ANIMALS[a.type]; const now=Date.now(); if(now-a.lastCollect>=animal.interval){ player.inventory[animal.product]=(player.inventory[animal.product]||0)+1; player.gold+=animal.sellProduct; player.score++; a.lastCollect=now; saveGame(); renderGame(); showMessage(`🥚 جمعت ${animal.productEmoji} ${animal.product}! +${formatMoney(animal.sellProduct)}`); } else { showMessage(`⏳ ستنتج بعد ${Math.ceil((animal.interval-(now-a.lastCollect))/1000)} ثانية`); } }
+        function logoutToDashboard() { window.location.href='dashboard.html'; }
         function renderGame() {
-            const currentLevel = calculateLevel(player.score);
-            const nextLevelPoints = pointsToNextLevel(player.score);
-            const progressPercent = levelProgress(player.score);
-            
-            let fieldsHtml = '<div class="fields-grid">';
-            for (let i=0; i<4; i++) {
-                const f = player.fields[i];
-                if (f) {
-                    const crop = CROPS[f.crop];
-                    const elapsed = (Date.now() - f.plantedAt)/1000;
-                    const ready = elapsed >= crop.growTime;
-                    const percent = Math.min(100, (elapsed / crop.growTime)*100);
-                    fieldsHtml += `<div class="field ${ready ? 'ready' : ''}" onclick="window.harvestField(${i})">
-                        <div style="font-size:32px;">${crop.emoji}</div>
-                        <div>${crop.name}</div>
-                        <div style="background:#4f7840; height:4px; border-radius:4px;">
-                            <div style="background:#ffcf4a; width:${percent}%; height:4px;"></div>
-                        </div>
-                        <div style="font-size:11px;">${ready ? '✅ جاهز' : `${Math.ceil(crop.growTime - elapsed)} ثانية`}</div>
-                    </div>`;
-                } else {
-                    let btns = '';
-                    for (let [key, crop] of Object.entries(CROPS)) {
-                        const unlocked = isCropUnlocked(key);
-                        btns += `<button class="crop-btn ${unlocked ? '' : 'locked'}" onclick="window.plantCrop('${key}', ${i})" ${!unlocked ? 'disabled' : ''}>
-                            ${crop.emoji} ${crop.name} (${formatMoney(crop.buy)})
-                        </button>`;
-                    }
-                    fieldsHtml += `<div class="field" style="cursor:default;"><div style="font-size:32px;">🌾</div><div>حقل فارغ</div><div style="margin-top:8px;">${btns}</div></div>`;
+            const currentLevel=calculateLevel(player.score);
+            const nextLevelPoints=pointsToNextLevel(player.score);
+            const progressPercent=levelProgress(player.score);
+            let fieldsHtml='<div class="fields-grid">';
+            for(let i=0;i<4;i++){ const f=player.fields[i];
+                if(f){ const crop=CROPS[f.crop]; const elapsed=(Date.now()-f.plantedAt)/1000; const ready=elapsed>=crop.growTime; const percent=Math.min(100,(elapsed/crop.growTime)*100);
+                    fieldsHtml+=`<div class="field ${ready?'ready':''}" onclick="window.harvestField(${i})"><div style="font-size:32px;">${crop.emoji}</div><div>${crop.name}</div><div style="background:#4f7840; height:4px;"><div style="background:#ffcf4a; width:${percent}%; height:4px;"></div></div><div style="font-size:11px;">${ready?'✅ جاهز':`${Math.ceil(crop.growTime-elapsed)} ثانية`}</div></div>`;
+                } else { let btns=''; for(let [key,crop] of Object.entries(CROPS)){ const unlocked=isCropUnlocked(key); btns+=`<button class="crop-btn ${unlocked?'':'locked'}" onclick="window.plantCrop('${key}',${i})" ${!unlocked?'disabled':''}>${crop.emoji} ${crop.name} (${formatMoney(crop.buy)})</button>`; }
+                    fieldsHtml+=`<div class="field" style="cursor:default;"><div style="font-size:32px;">🌾</div><div>حقل فارغ</div><div style="margin-top:8px;">${btns}</div></div>`;
                 }
             }
-            fieldsHtml += '</div><button onclick="window.harvestAll()">🌾 حصاد جميع المحاصيل</button>';
-            
-            let animalsHtml = '';
-            for (let i=0; i<player.animals.length; i++) {
-                const a = player.animals[i];
-                const animal = ANIMALS[a.type];
-                const now = Date.now();
-                const ready = (now - a.lastCollect) >= animal.interval;
-                const remain = Math.ceil((animal.interval - (now - a.lastCollect))/1000);
-                animalsHtml += `<div class="animal-card ${ready ? 'ready' : ''}" onclick="window.collectAnimal(${i})">
-                    <span>${animal.emoji} ${animal.name}</span>
-                    <span>${animal.productEmoji} ${animal.product}</span>
-                    <span>${ready ? '✅ جاهز' : `⏳ ${remain} ثانية`}</span>
-                </div>`;
-            }
-            if (player.animals.length === 0) animalsHtml = '<p style="text-align:center;">🐣 لا توجد حيوانات. اشترِ حيواناً من الأسفل</p>';
-            
-            let buyAnimalsHtml = '';
-            for (let [key, animal] of Object.entries(ANIMALS)) {
-                buyAnimalsHtml += `<button style="margin:5px;" onclick="window.buyAnimal('${key}')">${animal.emoji} شراء ${animal.name} (${formatMoney(animal.price)})</button>`;
-            }
-            
-            let invHtml = '<div style="display:flex; flex-wrap:wrap; gap:8px;">';
-            for (let [item, qty] of Object.entries(player.inventory)) {
-                if(qty>0) invHtml += `<span class="inventory-item">📦 ${item}: ${qty}</span>`;
-            }
-            invHtml += '</div>';
-            if (Object.keys(player.inventory).filter(k => player.inventory[k]>0).length === 0) invHtml = '<p>📭 مخزنك فارغ</p>';
-            
-            let newCropsMsg = '';
-            for (let [key, crop] of Object.entries(CROPS)) {
-                if (crop.levelReq === currentLevel && !player.inventory[key]) {
-                    newCropsMsg += `<span class="new-crop-badge">✨ جديد: ${crop.emoji} ${crop.name}</span>`;
-                }
-            }
-            
-            document.getElementById('app').innerHTML = `
-                <div class="game-container">
-                    <div class="header">
-                        <div class="gold">💰 ${formatMoney(player.gold)}</div>
-                        <div class="level">🏆 المستوى ${currentLevel} <span>⭐ ${player.score} نقطة</span></div>
-                        <div class="nav-buttons"><button class="nav-btn" id="dashboardBtn">🏠 القائمة الرئيسية</button></div>
-                    </div>
-                    <div class="level-progress">
-                        <div style="display:flex; justify-content:space-between; font-size:12px;">
-                            <span>المستوى ${currentLevel}</span>
-                            <span>${nextLevelPoints} نقطة للمستوى ${currentLevel+1}</span>
-                        </div>
-                        <div class="progress-bar"><div class="progress-fill" style="width:${progressPercent}%;"></div></div>
-                    </div>
-                    ${newCropsMsg ? `<div style="text-align:center; margin:10px 0;">${newCropsMsg}</div>` : ''}
-                    <div class="tabs">
-                        <div class="tab ${activeTab==='farm'?'active':''}" data-tab="farm">🌾 المزرعة</div>
-                        <div class="tab ${activeTab==='animals'?'active':''}" data-tab="animals">🐔 الحيوانات</div>
-                        <div class="tab ${activeTab==='inventory'?'active':''}" data-tab="inventory">📦 المخزون</div>
-                    </div>
-                    <div class="content">
-                        <div id="farmContent" style="display:${activeTab==='farm'?'block':'none'}">${fieldsHtml}</div>
-                        <div id="animalsContent" style="display:${activeTab==='animals'?'block':'none'}">
-                            ${animalsHtml}<hr><div style="text-align:center;">${buyAnimalsHtml}</div>
-                        </div>
-                        <div id="inventoryContent" style="display:${activeTab==='inventory'?'block':'none'}">${invHtml}</div>
-                        <div id="message" class="message"></div>
-                    </div>
-                </div>`;
-            
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.onclick = () => { activeTab = tab.dataset.tab; renderGame(); };
-            });
-            document.getElementById('dashboardBtn').onclick = logoutToDashboard;
+            fieldsHtml+='</div><button onclick="window.harvestAll()">🌾 حصاد جميع المحاصيل</button>';
+            let animalsHtml=''; for(let i=0;i<player.animals.length;i++){ const a=player.animals[i]; const animal=ANIMALS[a.type]; const now=Date.now(); const ready=(now-a.lastCollect)>=animal.interval; const remain=Math.ceil((animal.interval-(now-a.lastCollect))/1000); animalsHtml+=`<div class="animal-card ${ready?'ready':''}" onclick="window.collectAnimal(${i})"><span>${animal.emoji} ${animal.name}</span><span>${animal.productEmoji} ${animal.product}</span><span>${ready?'✅ جاهز':`⏳ ${remain} ثانية`}</span></div>`; }
+            if(player.animals.length===0) animalsHtml='<p style="text-align:center;">🐣 لا توجد حيوانات. اشترِ حيواناً من الأسفل</p>';
+            let buyAnimalsHtml=''; for(let [key,animal] of Object.entries(ANIMALS)) buyAnimalsHtml+=`<button style="margin:5px;" onclick="window.buyAnimal('${key}')">${animal.emoji} شراء ${animal.name} (${formatMoney(animal.price)})</button>`;
+            let invHtml='<div style="display:flex; flex-wrap:wrap; gap:8px;">'; for(let [item,qty] of Object.entries(player.inventory)) if(qty>0) invHtml+=`<span class="inventory-item">📦 ${item}: ${qty}</span>`; invHtml+='</div>'; if(Object.keys(player.inventory).filter(k=>player.inventory[k]>0).length===0) invHtml='<p>📭 مخزنك فارغ</p>';
+            let newCropsMsg=''; for(let [key,crop] of Object.entries(CROPS)) if(crop.levelReq===currentLevel && !player.inventory[key]) newCropsMsg+=`<span class="new-crop-badge">✨ جديد: ${crop.emoji} ${crop.name}</span>`;
+            document.getElementById('app').innerHTML=`<div class="game-container"><div class="header"><div class="gold">💰 ${formatMoney(player.gold)}</div><div class="level">🏆 المستوى ${currentLevel} <span>⭐ ${player.score} نقطة</span></div><div class="nav-buttons"><button class="nav-btn" id="dashboardBtn">🏠 القائمة الرئيسية</button></div></div><div class="level-progress"><div style="display:flex; justify-content:space-between; font-size:12px;"><span>المستوى ${currentLevel}</span><span>${nextLevelPoints} نقطة للمستوى ${currentLevel+1}</span></div><div class="progress-bar"><div class="progress-fill" style="width:${progressPercent}%;"></div></div></div>${newCropsMsg?`<div style="text-align:center; margin:10px 0;">${newCropsMsg}</div>`:''}<div class="tabs"><div class="tab ${activeTab==='farm'?'active':''}" data-tab="farm">🌾 المزرعة</div><div class="tab ${activeTab==='animals'?'active':''}" data-tab="animals">🐔 الحيوانات</div><div class="tab ${activeTab==='inventory'?'active':''}" data-tab="inventory">📦 المخزون</div></div><div class="content"><div id="farmContent" style="display:${activeTab==='farm'?'block':'none'}">${fieldsHtml}</div><div id="animalsContent" style="display:${activeTab==='animals'?'block':'none'}">${animalsHtml}<hr><div style="text-align:center;">${buyAnimalsHtml}</div></div><div id="inventoryContent" style="display:${activeTab==='inventory'?'block':'none'}">${invHtml}</div><div id="message" class="message"></div></div></div>`;
+            document.querySelectorAll('.tab').forEach(tab=>{tab.onclick=()=>{activeTab=tab.dataset.tab; renderGame();};});
+            document.getElementById('dashboardBtn').onclick=logoutToDashboard;
         }
-        
-        session = loadSession();
-        if (session) {
-            loadGame();
-            renderGame();
-            setInterval(() => renderGame(), 1000);
-        }
-        
-        window.plantCrop = plantCrop;
-        window.harvestField = harvestField;
-        window.harvestAll = harvestAll;
-        window.buyAnimal = buyAnimal;
-        window.collectAnimal = collectAnimal;
+        session=loadSession(); if(session){ loadGame(); renderGame(); setInterval(()=>renderGame(),1000); }
+        window.plantCrop=plantCrop; window.harvestField=harvestField; window.harvestAll=harvestAll; window.buyAnimal=buyAnimal; window.collectAnimal=collectAnimal;
     </script>
 </body>
 </html>
