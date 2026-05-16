@@ -20,15 +20,12 @@
         .logout-btn { background: #8b5a2b; color: white; }
         .progress-bar { background: #4f7840; height: 6px; border-radius: 4px; margin-top: 8px; overflow: hidden; }
         .progress-fill { background: #ffcf4a; width: 0%; height: 100%; transition: width 0.3s; }
+        .buy-link { background: #8b5a2b; color: white; padding: 2px 8px; border-radius: 30px; font-size: 12px; text-decoration: none; margin-right: 8px; }
     </style>
 </head>
 <body>
     <div id="app">⏳ جاري التحميل...</div>
     <script>
-        let session = null;
-        let player = null;
-        let factories = []; // قائمة المصانع التي يمتلكها اللاعب
-        
         // تعريف الآلات المتاحة
         const MACHINES = {
             'mill': { name: 'مطحنة حبوب', emoji: '🏭', input: 'Wheat', output: 'Flour', time: 8, cost: 50, profit: 5 },
@@ -37,16 +34,64 @@
             'juicer': { name: 'معصرة فواكه', emoji: '🧃', input: 'Strawberry', output: 'Juice', time: 5, cost: 35, profit: 6 }
         };
         
-        function loadSession() { /* مثل السابق */ }
-        function loadGame() { /* مثل السابق */ }
-        function saveGame() { /* مثل السابق */ }
-        function showMessage(msg, isError) { /* مثل السابق */ }
+        let session = null;
+        let player = null;
+        let factories = [];
+        
+        // === دوال الجلسة والبيانات ===
+        function loadSession() {
+            const saved = localStorage.getItem('farmSession');
+            if (!saved) { window.location.href = 'index.html'; return null; }
+            try {
+                const data = JSON.parse(saved);
+                if (Date.now() - data.loginTime > 86400000) {
+                    localStorage.removeItem('farmSession');
+                    window.location.href = 'index.html';
+                    return null;
+                }
+                return data;
+            } catch(e) { window.location.href = 'index.html'; return null; }
+        }
+        
+        function loadGame() {
+            const saved = localStorage.getItem('farmGame_' + session.userId);
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    player = data;
+                    if (!player.inventory) player.inventory = {};
+                    if (!player.gold) player.gold = 0;
+                } catch(e) {}
+            }
+            if (!player) player = { gold: 0, score: 0, inventory: { Wheat: 0, Carrot: 0 }, fields: [], animals: [] };
+        }
+        
+        function saveGame() {
+            localStorage.setItem('farmGame_' + session.userId, JSON.stringify({
+                gold: player.gold,
+                score: player.score,
+                fields: player.fields || [],
+                animals: player.animals || [],
+                inventory: player.inventory
+            }));
+        }
+        
+        function showMessage(msg, isError = false) {
+            const msgDiv = document.getElementById('message');
+            if (msgDiv) {
+                msgDiv.innerHTML = msg;
+                msgDiv.className = isError ? 'message error-message' : 'message';
+                msgDiv.style.display = 'block';
+                setTimeout(() => { msgDiv.style.display = 'none'; }, 3000);
+            }
+        }
         
         function loadFactories() {
             const key = session.isGuest ? 'guestFactories' : 'factories_' + session.username;
             const saved = localStorage.getItem(key);
             factories = saved ? JSON.parse(saved) : [];
         }
+        
         function saveFactories() {
             const key = session.isGuest ? 'guestFactories' : 'factories_' + session.username;
             localStorage.setItem(key, JSON.stringify(factories));
@@ -57,7 +102,7 @@
             const machine = MACHINES[machineId];
             if (!machine) return;
             if (player.gold < machine.cost) {
-                showMessage(`⚠️ تحتاج ${machine.cost} ذهب`, true);
+                showMessage(`⚠️ تحتاج ${machine.cost} ذهب لشراء ${machine.name}`, true);
                 return;
             }
             player.gold -= machine.cost;
@@ -74,17 +119,25 @@
             showMessage(`✅ اشتريت ${machine.emoji} ${machine.name}`);
         }
         
+        // التوجيه إلى السوق لشراء المادة الخام المطلوبة
+        function buyFromMarket(ingredient) {
+            localStorage.setItem('market_focus_item', ingredient);
+            window.location.href = 'market.html';
+        }
+        
         // بدء الإنتاج في آلة معينة
         function startProduction(factoryIndex) {
             const fac = factories[factoryIndex];
             const machine = MACHINES[fac.type];
             if (fac.status === 'busy') {
-                showMessage('الآلة مشغولة حالياً', true);
+                showMessage('⚠️ الآلة مشغولة حالياً', true);
                 return;
             }
             const requiredQty = 1;
-            if (!player.inventory[machine.input] || player.inventory[machine.input] < requiredQty) {
-                showMessage(`⚠️ تحتاج ${requiredQty} من ${machine.input}`, true);
+            const available = player.inventory[machine.input] || 0;
+            if (available < requiredQty) {
+                showMessage(`⚠️ لا تملك ${machine.input}. يمكنك شراؤه من السوق.`, true);
+                // إضافة رابط شراء سريع في الرسالة (اختياري)
                 return;
             }
             player.inventory[machine.input] -= requiredQty;
@@ -99,13 +152,12 @@
         
         function checkProductionCompletion() {
             let updated = false;
-            for (let i=0; i<factories.length; i++) {
+            for (let i = 0; i < factories.length; i++) {
                 const fac = factories[i];
                 if (fac.status === 'busy') {
                     const machine = MACHINES[fac.type];
                     const elapsed = (Date.now() - fac.startTime) / 1000;
                     if (elapsed >= machine.time) {
-                        // إتمام الإنتاج
                         fac.status = 'idle';
                         fac.startTime = 0;
                         player.inventory[machine.output] = (player.inventory[machine.output] || 0) + 1;
@@ -124,29 +176,45 @@
             }
         }
         
+        function logoutToDashboard() {
+            window.location.href = 'dashboard.html';
+        }
+        
         function renderFactory() {
             checkProductionCompletion();
+            
             let machinesHtml = '';
-            for (let i=0; i<factories.length; i++) {
+            for (let i = 0; i < factories.length; i++) {
                 const fac = factories[i];
                 const machine = MACHINES[fac.type];
                 let statusHtml = '';
                 if (fac.status === 'busy') {
+                    const remaining = Math.ceil((machine.time - (Date.now() - fac.startTime) / 1000));
                     statusHtml = `
-                        <div>⏳ جاري الإنتاج (${Math.ceil((machine.time - (Date.now() - fac.startTime)/1000))} ثانية)</div>
+                        <div>⏳ جاري الإنتاج (${remaining} ثانية)</div>
                         <div class="progress-bar"><div class="progress-fill" style="width:${fac.progress}%;"></div></div>
                     `;
                 } else {
-                    statusHtml = `<div>✅ جاهز للإنتاج</div><button onclick="window.startProduction(${i})">▶️ ابدأ الإنتاج (يتطلب ${machine.input})</button>`;
+                    const hasInput = (player.inventory[machine.input] || 0) >= 1;
+                    statusHtml = `
+                        <div>
+                            ${hasInput ? '✅ جاهز للإنتاج' : `⚠️ ينقصك ${machine.input} <a class="buy-link" href="#" onclick="event.preventDefault(); window.buyFromMarket('${machine.input}');">🛒 شراء</a>`}
+                        </div>
+                        ${hasInput ? `<button onclick="window.startProduction(${i})">▶️ ابدأ الإنتاج (يتطلب ${machine.input})</button>` : ''}
+                    `;
                 }
                 machinesHtml += `
                     <div class="machine-card">
-                        <div><strong>${machine.emoji} ${machine.name}</strong><br>المدخل: ${machine.input} → المنتج: ${machine.output} (ربح ${machine.profit} ذهب)<br>الوقت: ${machine.time} ثانية</div>
-                        ${statusHtml}
+                        <div>
+                            <strong>${machine.emoji} ${machine.name}</strong><br>
+                            المدخل: ${machine.input} → المنتج: ${machine.output}<br>
+                            الربح: ${machine.profit} ذهب | الوقت: ${machine.time} ثانية | التكلفة: ${machine.cost} ذهب
+                        </div>
+                        <div>${statusHtml}</div>
                     </div>
                 `;
             }
-            if (factories.length === 0) machinesHtml = '<p>لا تملك آلات بعد. اشترِ آلة للبدء.</p>';
+            if (factories.length === 0) machinesHtml = '<p>🚫 لا تملك آلات بعد. اشترِ آلة للبدء.</p>';
             
             let buyBtns = '';
             for (let [id, m] of Object.entries(MACHINES)) {
@@ -165,16 +233,13 @@
                         <div class="gold">💰 ${player.gold} ذهب</div>
                         <div>👤 ${session.username}</div>
                         <div class="nav-buttons">
-                            <a href="dashboard.html" class="nav-btn">🏠 الرئيسية</a>
-                            <a href="market.html" class="nav-btn">🛒 السوق</a>
-                            <a href="delivery.html" class="nav-btn">🚚 النقل</a>
-                            <button class="logout-btn" id="logoutBtn">🚪 خروج</button>
+                            <button class="nav-btn" id="dashboardBtn">🏠 القائمة الرئيسية</button>
                         </div>
                     </div>
                     <div class="content">
                         <h2>🏭 المصنع</h2>
                         <div class="factory-card">
-                            <h3>آلاتي</h3>
+                            <h3>⚙️ آلاتي</h3>
                             ${machinesHtml}
                             <hr>
                             <h3>➕ شراء آلات جديدة</h3>
@@ -185,9 +250,10 @@
                     </div>
                 </div>
             `;
-            document.getElementById('logoutBtn').onclick = () => { localStorage.removeItem('farmSession'); window.location.href = 'index.html'; };
+            document.getElementById('dashboardBtn').onclick = logoutToDashboard;
         }
         
+        // بدء التشغيل
         session = loadSession();
         if (session) {
             loadGame();
@@ -198,6 +264,7 @@
         
         window.buyMachine = buyMachine;
         window.startProduction = startProduction;
+        window.buyFromMarket = buyFromMarket;
     </script>
 </body>
 </html>
